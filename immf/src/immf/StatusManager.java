@@ -41,6 +41,7 @@ public class StatusManager {
 
 	private List<Cookie> cookies;
 	private String lastMailId;
+	private String lastSpMsgId;
 	private String pushCredentials;
 	private String needConnect;
 
@@ -56,6 +57,7 @@ public class StatusManager {
 			fis = new FileInputStream(this.f);
 			prop.load(fis);
 			this.lastMailId = prop.getProperty("lastmailid");
+			this.lastSpMsgId = prop.getProperty("lastspmsgId");
 			this.pushCredentials = prop.getProperty("push_credentials");
 			String nc = prop.getProperty("needconnect");
 			if(this.needConnect==null){
@@ -98,6 +100,12 @@ public class StatusManager {
 	public void setLastMailId(String s){
 		this.lastMailId = s;
 	}
+	public String getLastSpMsgId(){
+		return lastSpMsgId;
+	}
+	public void setLastSpMsgId(String s){
+		this.lastSpMsgId = s;
+	}
 	public String getPushCredentials(){
 		return pushCredentials;
 	}
@@ -135,6 +143,9 @@ public class StatusManager {
 		}
 		if(this.lastMailId!=null){
 			prop.setProperty("lastmailid", this.lastMailId);
+		}
+		if(this.lastSpMsgId!=null){
+			prop.setProperty("lastspmsgId", this.lastSpMsgId);
 		}
 		if(this.pushCredentials!=null && this.pushCredentials.length()>0){
 			prop.setProperty("push_credentials", this.pushCredentials);

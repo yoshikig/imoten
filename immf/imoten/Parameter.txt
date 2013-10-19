@@ -550,6 +550,34 @@ sender.async
 　デフォルト[false]
 
 
+---------------------------------------------------
+■spモードメールに関係するパラメータ
+spmode.mail
+spmode.passwd
+　[spmode.mail]はdocomoで使用しているspモードメールアドレスを指定してください。
+　[spmode.passwd]はspモードにpop3接続する際に使用する110文字程度のパスワードを指定してください。
+
+spmode.checkinterval
+　spmodeで新着メールをチェックする間隔(秒)を指定します。imodeの場合の[imodenet.checkinterval]と意味は同じです。
+　デフォルト[900](15分)。
+
+forward.only
+　[forward.]からはじまる各転送先設定をiモードメールを受信した場合のみ転送するのか、
+　spモードメールを受信した場合のみ転送するのか指定できます。
+　デフォルト動作はiモード、spモードどちらを受信した場合もforward指定されているメールアドレスに転送します。
+　設定可能値は以下の通りです。
+　- [無指定]：iモード、spモードどちらも転送
+　- [imode]：iモードメール受信時のみ転送
+　- [spmode]：spモードメール受信時のみ転送
+
+sender.smtp.spmode.user
+sender.smtp.spmode.passwd
+　spモードメールをimoten経由で送信する場合の認証ユーザ名、認証パスワードを指定します。
+　imode.netの場合の[sender.smtp.user][sender.smtp.passwd]と同じ用法です。
+　imotenは[sender.smtp.user]と[sender.smtp.spmode.user]のどちらのユーザで認証したかによって
+　imode.net経由でメールを送信するかspモード経由でメールを送信するか判断します。
+
+
 ■サンプル
 SMTPサーバ関係のみ記述しています。
 転送先でなく転送に使用するメールサーバの設定です。

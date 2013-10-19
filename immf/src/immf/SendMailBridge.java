@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.mail.BodyPart;
+import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
@@ -53,14 +54,18 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 	private ImodeNetClient client;
 	private SendMailPicker picker;
 	private StatusManager status;
+	private Config conf;
 
-	private String user;
-	private String passwd;
+	private String imodeUser;
+	private String imodePasswd;
+	private String spmodeUser;
+	private String spmodePasswd;
 	private String alwaysBcc;
 	private boolean forcePlainText;
 	private boolean isForwardSent;
 	private boolean stripAppleQuote;
 	private boolean editDocomoSubjectPrefix;
+	private boolean isImode = true;
 
 	private MyWiser wiser;
 	private CharacterConverter charConv;
@@ -75,11 +80,14 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 		if(conf.getSenderSmtpPort()<=0){
 			return;
 		}
+		this.conf = conf;
 		this.client = client;
 		this.picker = picker;
 		this.status = status;
-		this.user = conf.getSenderUser();
-		this.passwd = conf.getSenderPasswd();
+		this.imodeUser = conf.getSenderUser();
+		this.imodePasswd = conf.getSenderPasswd();
+		this.spmodeUser = conf.getSenderSpmodeUser();
+		this.spmodePasswd = conf.getSenderSpmodePasswd();
 		this.alwaysBcc = conf.getSenderAlwaysBcc();
 		this.forcePlainText = conf.isSenderMailForcePlainText();
 		this.isForwardSent = conf.isForwardSent();
@@ -95,6 +103,7 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 			}
 		}
 		this.charConv.setConvertSoftbankSjis(conf.isSenderConvertSoftbankSjis());
+		SpmodeSendMail.setCharConv(charConv);
 		this.googleCharConv = new CharacterConverter();
 		if(conf.getSenderGoogleCharConvertFile()!=null){
 			try{
@@ -102,6 +111,7 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 			}catch (Exception e) {
 				log.error("文字変換表("+conf.getSenderGoogleCharConvertFile()+")が読み込めませんでした。",e);
 			}
+			SpmodeSendMail.setGoomojiSubjectCharConv(googleCharConv);
 		}
 		this.useGoomojiSubject = conf.isSenderUseGoomojiSubject();
 
@@ -133,6 +143,14 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 			log.info("From       "+msg.getEnvelopeSender());
 			log.info("Recipients  "+msg.getEnvelopeReceiver());
 
+			if(isImode){
+				log.info("iモード動作モード");
+			}else{
+				log.info("spモード動作モード");
+				SpmodeSendMail spmodeSendMail = new SpmodeSendMail(msg,conf);
+				spmodeSendMail.send();
+				return;
+			}
 			MimeMessage mime = msg.getMimeMessage();
 
 			String messageId = mime.getHeader("Message-ID", null);
@@ -712,8 +730,13 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 
 	public void login(String user, String pass) throws LoginFailedException {
 		log.debug("* SMTP Login *");
-		if(!StringUtils.equals(this.user, user)
-				||!StringUtils.equals(this.passwd, pass)){
+		if(StringUtils.equals(this.imodeUser, user)&&StringUtils.equals(this.imodePasswd, pass)){
+			log.info("iモードメール認証");
+			isImode = true;
+		}else if(StringUtils.equals(this.spmodeUser, user)&&StringUtils.equals(this.spmodePasswd, pass)){
+			log.info("spモードメール認証");
+			isImode = false;
+		}else{
 			log.warn("SMTP 認証エラー User "+user+"/ Pass "+pass);
 			throw new LoginFailedException("SMTP Auth Login Error.");
 		}

@@ -45,6 +45,12 @@ public class Config {
 	// imode.netアカウント
 	private String docomoId;
 	private String docomoPasswd;
+	
+	// spモードメールアカウント
+	private String spmodeMailAddr;
+	private String spmodeMailPasswd;
+	// spモードのメールボックスの読み書き属性
+	private boolean spmodeReadonly = true;
 
 	// SMTPサーバ
 	private String smtpServer;
@@ -138,6 +144,7 @@ public class Config {
 	private int checkIntervalSec = 60;
 	private int forceCheckIntervalSec = 60 * 60;
 	private int checkFileIntervalSec = checkIntervalSec;
+	private int spmodeCheckIntervalSec = 60 * 15; // 15分=iPhone最小値
 
 	// ログインエラー時のリトライ間隔(秒)
 	// 失敗時はimode.netのメンテナンスの可能性があるので長めで
@@ -151,6 +158,10 @@ public class Config {
 	// 転送エラー時のリトライ最大回数
 	// forwardAsync = true の場合のみ有効
 	private int forwardRetryMaxCount = 0;
+	
+	// imode/spmodeの選択
+	public enum ForwardOnly {Imode, SPmode, BOTH};
+	private ForwardOnly forwardOnly = ForwardOnly.BOTH;
 
 	// trueの場合はcookieの情報をファイルに保存する。
 	// 再起動など短時間プログラムを停止してもログイン状態が保持されるので
@@ -200,6 +211,8 @@ public class Config {
 	private int senderSmtpPort = -1;
 	private String senderUser = "z8$k>Lo2#aEeo@a(aw!";
 	private String senderPasswd = "<87a!Oa#3gpoYz0'->L";
+	private String senderSpmodeUser = senderUser;
+	private String senderSpmodePasswd = senderPasswd;
 	private String senderAlwaysBcc = null;
 	private boolean senderMailForcePlainText = true;
 	private List<String> senderCharCovertFile = new ArrayList<String>();
@@ -287,6 +300,9 @@ public class Config {
 
 		this.docomoId = 		getString("docomo.id", null);
 		this.docomoPasswd = 	getString("docomo.passwd", null);
+		this.spmodeMailAddr =	getString("spmode.mail", null);
+		this.spmodeMailPasswd = getString("spmode.passwd", null);
+		this.spmodeReadonly =	getBoolean("spmode.mbox.readonly", this.spmodeReadonly);
 		this.smtpServer = 		getString("smtp.server", null);
 		this.smtpPort = 		getInt(   "smtp.port", this.smtpPort);
 		this.smtpConnectTimeoutSec = getInt("smtp.connecttimeout", this.smtpConnectTimeoutSec);
@@ -358,11 +374,18 @@ public class Config {
 		this.forwardAsync = getBoolean("forward.async", this.forwardAsync);
 		this.forwardRetryIntervalSec = getInt("forward.retryinterval", this.forwardRetryIntervalSec);
 		this.forwardRetryMaxCount = getInt("forward.retrymaxcount", this.forwardRetryMaxCount);
+		String s2 = getString("forward"+n+".only", "");
+		if(s2.equalsIgnoreCase("imode")){
+			this.forwardOnly = ForwardOnly.Imode;
+		}else if(s2.equalsIgnoreCase("spmode")){
+			this.forwardOnly = ForwardOnly.SPmode;
+		}
 		this.ignoreDomainFile = getString("forward.ignoredomainfile", this.ignoreDomainFile);
 		*/
 		this.checkIntervalSec = getInt("imodenet.checkinterval", this.checkIntervalSec);
 		this.forceCheckIntervalSec = getInt("imodenet.forcecheckinterval", this.forceCheckIntervalSec);
 		this.checkFileIntervalSec = getInt("imodenet.checkfileinterval", this.checkIntervalSec);
+		this.spmodeCheckIntervalSec = getInt("spmode.checkinterval", this.spmodeCheckIntervalSec);
 		this.loginRetryIntervalSec = getInt("imodenet.logininterval", this.loginRetryIntervalSec);
 		this.saveCookie = getBoolean("save.cookie", this.saveCookie);
 		this.statusFile = getString("save.filename", this.statusFile);
@@ -382,6 +405,8 @@ public class Config {
 		this.senderSmtpPort = getInt("sender.smtp.port", this.senderSmtpPort);
 		this.senderUser = getString("sender.smtp.user", this.senderUser);
 		this.senderPasswd = getString("sender.smtp.passwd", this.senderPasswd);
+		this.senderSpmodeUser = getString("sender.smtp.spmode.user", this.senderSpmodeUser);
+		this.senderSpmodePasswd = getString("sender.smtp.spmode.passwd", this.senderSpmodePasswd);
 		this.senderAlwaysBcc = getString("sender.alwaysbcc", this.senderAlwaysBcc);
 		this.senderCharCovertFile = splitComma(getString("sender.charconvfile", ""));
 		// imode.netでhtmlをチェックしてるようで、PCで作成したhtmlメールはエラーになるのでテキストのみ許可
@@ -401,6 +426,7 @@ public class Config {
 		this.checkIntervalSec = Math.max(this.checkIntervalSec, 3);
 		this.forceCheckIntervalSec = Math.max(this.forceCheckIntervalSec, 3);
 		this.checkFileIntervalSec = Math.max(this.checkFileIntervalSec, 3);
+		this.spmodeCheckIntervalSec = Math.max(this.spmodeCheckIntervalSec, 10);
 		this.smtpConnectTimeoutSec = Math.max(this.smtpConnectTimeoutSec, 10);
 		this.smtpTimeoutSec = Math.max(this.smtpTimeoutSec, 3);
 		this.loginRetryIntervalSec = Math.max(this.loginRetryIntervalSec, 3);
@@ -473,6 +499,12 @@ public class Config {
 		this.forwardAsync = getBoolean("forward"+n+".async", this.forwardAsync);
 		this.forwardRetryIntervalSec = getInt("forward.retryinterval", this.forwardRetryIntervalSec);
 		this.forwardRetryMaxCount = getInt("forward.retrymaxcount", this.forwardRetryMaxCount);
+		String s2 = getString("forward"+n+".only", "");
+		if(s2.equalsIgnoreCase("imode")){
+			this.forwardOnly = ForwardOnly.Imode;
+		}else if(s2.equalsIgnoreCase("spmode")){
+			this.forwardOnly = ForwardOnly.SPmode;
+		}
 		this.ignoreDomainFile = getString("forward"+n+".ignoredomainfile", this.ignoreDomainFile);
 
 		this.contentTransferEncoding = getString("mail"+n+".contenttransferencoding", null);
@@ -530,6 +562,22 @@ public class Config {
 
 	public String getDocomoPasswd() {
 		return docomoPasswd;
+	}
+
+	public String getSpmodeMailUser() {
+		if(spmodeMailAddr!=null){
+			return spmodeMailAddr.split("@")[0];
+		}else{
+			return null;
+		}
+	}
+
+	public String getSpmodeMailPasswd() {
+		return spmodeMailPasswd;
+	}
+
+	public boolean isSpmodeReadonly() {
+		return spmodeReadonly;
 	}
 
 	public String getGmailId() {
@@ -651,6 +699,10 @@ public class Config {
 		return checkFileIntervalSec;
 	}
 
+	public int getSpmodeCheckIntervalSec() {
+		return spmodeCheckIntervalSec;
+	}
+
 	public int getLoginRetryIntervalSec() {
 		return loginRetryIntervalSec;
 	}
@@ -661,6 +713,10 @@ public class Config {
 
 	public int getForwardRetryMaxCount() {
 		return forwardRetryMaxCount;
+	}
+
+	public ForwardOnly getForwardOnly() {
+		return forwardOnly;
 	}
 
 	public boolean isSaveCookie() {
@@ -721,6 +777,14 @@ public class Config {
 
 	public String getSenderPasswd() {
 		return senderPasswd;
+	}
+
+	public String getSenderSpmodeUser() {
+		return senderSpmodeUser;
+	}
+
+	public String getSenderSpmodePasswd() {
+		return senderSpmodePasswd;
 	}
 
 	public String getSenderAlwaysBcc() {
