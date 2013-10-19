@@ -145,7 +145,9 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				this.plainBody = p.getContent().toString();
 				log.info("plainBody["+plainBody+"]");
 				plainBody = SpmodeSendMail.charConv.convert(plainBody, "UTF-8");
-				this.setTextMsg(plainBody);
+				if(!this.plainBody.isEmpty()){
+					this.setTextMsg(plainBody);
+				}
 			} catch (Exception e) {
 				log.warn("parse plainBody error",e);
 				this.plainBody = "";
