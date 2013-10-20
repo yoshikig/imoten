@@ -183,10 +183,12 @@ public class SpmodeCheckMail implements Runnable{
 				this.status.setLastSpMsgId(thisId);
 				log.info("LastSpMsgIdが空なので、次のメールから転送を開始します。");
 			}
-			String lastId = this.status.getLastSpMsgId();
-			if(lastId!=null && !lastId.equals(thisId)){
-				this.status.setLastSpMsgId(thisId);
-				log.info("LastSpMsgIdを更新しました");
+			if(!thisId.isEmpty()){
+				String lastId = this.status.getLastSpMsgId();
+				if(lastId!=null && !lastId.equals(thisId)){
+					this.status.setLastSpMsgId(thisId);
+					log.info("LastSpMsgIdを更新しました");
+				}
 			}
 			try{
 				this.status.save();
