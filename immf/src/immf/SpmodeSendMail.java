@@ -50,6 +50,9 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	private Config conf;
 	private static CharacterConverter charConv = null;
 	private static CharacterConverter goomojiSubjectCharConv = null;
+	private String alwaysBcc;
+	private boolean stripAppleQuote;
+	private boolean editDocomoSubjectPrefix;
 
 	public SpmodeSendMail(MyWiserMessage sm, Config conf) throws EmailException{
 		this.conf = conf;
@@ -58,6 +61,10 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		} catch (MessagingException e1) {
 			log.warn("error");
 		}
+
+		this.alwaysBcc = conf.getSenderAlwaysBcc();
+		this.stripAppleQuote = conf.isSenderStripiPhoneQuote();
+		this.editDocomoSubjectPrefix = conf.isSenderDocomoStyleSubject();
 
 		this.setDebug(conf.isMailDebugEnable());
 		this.setCharset("Shift_JIS");
@@ -114,6 +121,9 @@ public class SpmodeSendMail extends MyHtmlEmail {
 			}
 			// Bcc:
 			addSmmRecipientsList(sm.getEnvelopeReceiver());
+			if(this.alwaysBcc!=null){
+				smmRecipientsList.add(this.alwaysBcc);
+			}
 			List<String> smmBccAddrList = new ArrayList<String>();
 			smmBccAddrList = smmRecipientsList;
 			smmBccAddrList.removeAll(smmToCcAddrList);
@@ -144,6 +154,10 @@ public class SpmodeSendMail extends MyHtmlEmail {
 			try {
 				this.plainBody = p.getContent().toString();
 				log.info("plainBody["+plainBody+"]");
+				if(stripAppleQuote){
+					plainBody = Util.stripAppleQuotedLinesText(plainBody);
+					log.info("引用部省略["+plainBody+"]");
+				}
 				plainBody = SpmodeSendMail.charConv.convert(plainBody, "UTF-8");
 				if(!this.plainBody.isEmpty()){
 					this.setTextMsg(plainBody);
@@ -156,6 +170,10 @@ public class SpmodeSendMail extends MyHtmlEmail {
 			try {
 				this.htmlBody = p.getContent().toString();
 				log.info("htmlBody["+htmlBody+"]");
+				if(stripAppleQuote){
+					htmlBody = Util.stripAppleQuotedLinesHtml(htmlBody);
+					log.info("引用部省略["+htmlBody+"]");
+				}
 				htmlBody = SpmodeSendMail.charConv.convert(htmlBody, "UTF-8");
 				this.setHtmlMsg(htmlBody);
 			} catch (Exception e) {
@@ -198,9 +216,28 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		MimeMessage msg = this.getMimeMessage();
 		try{
 			msg.setHeader("X-Mailer", ServerMain.Version);
+		}catch (MessagingException e) {}
 
+		try{
 			String smmSubject = smm.getSubject();
 			log.info("Subject:"+smmSubject);
+
+			boolean editRe = false;
+			if(this.editDocomoSubjectPrefix){
+				Address[] to = msg.getRecipients(Message.RecipientType.TO);
+				if (to!=null){
+					for (Address addr : to){
+						String[] toString = ((InternetAddress)addr).getAddress().split("@",2);
+						if(smmSubject != null && toString[1].equals("docomo.ne.jp")){
+							editRe = true;
+						}
+					}
+				}
+				if(editRe){
+					smmSubject = Util.editDocomoStypeSubject(smmSubject);
+				}
+			}
+
 			try {
 				if (smmSubject != null) {
 					smmSubject = SpmodeSendMail.charConv.convertSubject(smmSubject);
@@ -217,12 +254,12 @@ public class SpmodeSendMail extends MyHtmlEmail {
 
 			msg.setSubject(encodeSjisText(smmSubject));
 
-			//if(this.conf.getContentTransferEncoding()!=null){
-			//	msg.setHeader("Content-Transfer-Encoding", this.conf.getContentTransferEncoding());
-			//}
+			if(this.conf.getContentTransferEncoding()!=null){
+				msg.setHeader("Content-Transfer-Encoding", this.conf.getContentTransferEncoding());
+			}
 
-		}catch (Exception e) {
-			log.warn(e);
+		}catch (MessagingException e) {
+			log.warn("Subject処理でエラーが発生",e);
 		}
 	}
 

@@ -580,12 +580,31 @@ public class Util {
 	 * iPhoneのMobileMail.appで返信時に必ず引用返信されて付加される部分を削除する
 	 */
 	public static void stripAppleQuotedLines(SenderMail sendMail){
+		String plainText = sendMail.getPlainTextContent();
+		if(plainText!=null){
+			plainText = stripAppleQuotedLinesText(plainText);
+			sendMail.setPlainTextContent(plainText);
+		}
+
+		String html = sendMail.getHtmlContent();
+		if(html!=null){
+			html = stripAppleQuotedLinesHtml(html);
+			sendMail.setHtmlContent(html);
+		}
+	}
+	public static String stripAppleQuotedLinesText(String s){
 		/*
 		 * <Region Format>
 		 * Japan
+		 *  (iOS5以前?)
 		 *  On yyyy/mm/dd, at HH:MM, メールアドレス wrote:
+		 *  (iOS6以降?)
+		 *  yyyy/mm/dd HH:MM、メールアドレス のメッセージ:
+		 *  
 		 * U.S.
 		 *  On (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) dd, yyyy, at HH:MM (PM|AM), address wrote:
+		 *  (書式は米国で日本語)
+		 *  (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) dd, yyyy HH:MM (PM|AM)、メールアドレス のメッセージ:
 		 */
 		/*
 		 * TEXTパート - 以下の形式を削除
@@ -596,17 +615,20 @@ public class Util {
 		 * |
 		 * |>
 		 */
-		String plainText = sendMail.getPlainTextContent();
+		String plainText = s;
 		if(plainText!=null){
 			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*On \\d+/\\d+/\\d+, at \\d+:\\d+, [^\n]* wrote:.*","");
 			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^\n]* wrote:.*","");
-			sendMail.setPlainTextContent(plainText);
-			//log.info("Stripped text: " + sendMail.getPlainTextContent());
+			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*\\d+/\\d+/\\d+ \\d+:\\d+、[^\n]* のメッセージ:.*","");
+			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*\\w\\w\\w \\d+, \\d+ \\d+:\\d+ \\wM、[^\n]* のメッセージ:.*","");
 		}
-
+		return plainText;
+	}
+	public static String stripAppleQuotedLinesHtml(String s){
 		/*
 		 * HTMLパート - 以下の形式を削除
 		 *
+		 * (iOS5以前?)
 		 * | :
 		 * | <div><br></div>
 		 * |</div>
@@ -615,17 +637,39 @@ public class Util {
 		 * |<br><br></div>
 		 * |<div></div>
 		 * |<blockquote type="cite">
+		 * 
+		 * (iOS6以降?)
+		 * | :
+		 * |</div>
+		 * |<div><br>
+		 * |年/月/日 時:分、 メールアドレス &lt;<a href="mailto:...> のメッセージ:
+		 * |<br><br></div>
+		 * |<blockquote type="cite">
 		 */
-		String html = sendMail.getHtmlContent();
+		String html = s;
 		if(html!=null){
 			// 厳密一致
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<div><br></div>)*</div><div><br>On \\d+/\\d+/\\d+, at \\d+:\\d+, [^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* wrote:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<div><br></div>)*</div><div><br>On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* wrote:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
+			html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\d+/\\d+/\\d+ \\d+:\\d+、[^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
+			html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\w\\w\\w \\d+, \\d+ \\d+:\\d+ \\wM、[^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			// htmlWorkingContent由来
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<br>)*On \\d+/\\d+/\\d+, at \\d+:\\d+, [^<>]* wrote:(?:<br>)*&gt;.*</body>", "</body>");
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<br>)*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^<>]* wrote:(?:<br>)*&gt;.*</body>", "</body>");
-			sendMail.setHtmlContent(html);
-			//log.info("Stripped html: " + sendMail.getHtmlContent());
 		}
+		return html;
+	}
+	public static String editDocomoStypeSubject(String s){
+		String subject = s;
+		if(subject.matches("^R[eE]: ?R[eE].*$")){
+			String reCounterStr = subject.replaceAll("^R[eE]: ?R[eE](\\d*):.*$","$1");
+			int reCounter = 2;
+			if(!reCounterStr.isEmpty()){
+				reCounter = Integer.parseInt(reCounterStr);
+				reCounter++;
+			}
+			subject = subject.replaceAll("^R[eE]: ?R[eE]\\d*:", "Re" + Integer.toString(reCounter) + ":");
+		}
+		return subject;
 	}
 }

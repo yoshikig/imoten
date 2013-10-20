@@ -217,26 +217,16 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 					subject = this.googleCharConv.convertSubject(goomojiSubject);
 			}
 
-			boolean editRe = false;
 			if(this.editDocomoSubjectPrefix){
+				boolean editRe = false;
 				for (InternetAddress addr : to){
 					String[] toString = addr.getAddress().split("@",2);
 					if(subject != null && toString[1].equals("docomo.ne.jp")){
 						editRe = true;
 					}
 				}
-			}
-			if(editRe){
-				if(subject.matches("^R[eE]: ?R[eE].*$")){
-					log.info("編集前subject: "+subject);
-					String reCounterStr = subject.replaceAll("^R[eE]: ?R[eE](\\d*):.*$","$1");
-					int reCounter = 2;
-					if(!reCounterStr.isEmpty()){
-						reCounter = Integer.parseInt(reCounterStr);
-						reCounter++;
-					}
-					subject = subject.replaceAll("^R[eE]: ?R[eE]\\d*:", "Re" + Integer.toString(reCounter) + ":");
-					log.info("編集後subject: "+subject);
+				if(editRe){
+					subject = Util.editDocomoStypeSubject(subject);
 				}
 			}
 
