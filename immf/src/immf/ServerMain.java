@@ -195,22 +195,26 @@ public class ServerMain {
 		// for Notify My Android
 		this.nmaNotifier = GrowlNotifier.getInstance(NMAClient.getInstance(), this.conf);
 
-		// iモードメール着信監視
-		if(this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
-			ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
-			Thread ti = new Thread(imodeChecker);
-			ti.setName("ImodeChecker");
-			ti.setDaemon(true);
-			ti.start();
-		}
+		if(!(this.conf.getForwardTo().isEmpty()
+				&& this.conf.getForwardCc().isEmpty()
+				&& this.conf.getForwardBcc().isEmpty())) {
+			// iモードメール着信監視
+			if(this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
+				ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
+				Thread ti = new Thread(imodeChecker);
+				ti.setName("ImodeChecker");
+				ti.setDaemon(true);
+				ti.start();
+			}
 		
-		// spモードメール着信監視
-		if(this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
-			SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this);
-			Thread ts = new Thread(spmodeChecker);
-			ts.setName("SpmodeChecker");
-			ts.setDaemon(true);
-			ts.start();
+			// spモードメール着信監視
+			if(this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
+				SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this);
+				Thread ts = new Thread(spmodeChecker);
+				ts.setName("SpmodeChecker");
+				ts.setDaemon(true);
+				ts.start();
+			}
 		}
 		
 		while(true){
