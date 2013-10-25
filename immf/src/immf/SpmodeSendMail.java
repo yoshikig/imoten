@@ -42,7 +42,7 @@ import org.apache.commons.mail.Email;
 import org.apache.commons.mail.EmailException;
 
 public class SpmodeSendMail extends MyHtmlEmail {
-	private static final Log log = LogFactory.getLog(SpmodeForwardMail.class);
+	private static final Log log = LogFactory.getLog(SpmodeSendMail.class);
 	private MimeMessage smm;
 	private String plainBody = "";
 	private String htmlBody = "";
