@@ -63,9 +63,12 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private boolean decomeFlg = false;
 	private boolean hasPlain = false;
 	private Config conf;
-	private static CharacterConverter subjectCharConv = null;
-	private static CharacterConverter goomojiSubjectCharConv = null;
-	private static StringConverter strConv = null;
+	private CharacterConverter subjectCharConv = null;
+	private CharacterConverter goomojiSubjectCharConv = null;
+	private StringConverter strConv = null;
+	private static Map<Config, CharacterConverter> subjectCharConvMap = null;
+	private static Map<Config, CharacterConverter> goomojiSubjectCharConvMap = null;
+	private static Map<Config, StringConverter> strConvMap = null;
 
 	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
 		this.smm = sm;
@@ -74,6 +77,25 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		this.setDebug(conf.isMailDebugEnable());
 		this.setCharset(this.conf.getMailEncode());
 		this.setContentTransferEncoding(this.conf.getContentTransferEncoding());
+
+		if(SpmodeForwardMail.subjectCharConvMap!=null
+				&& SpmodeForwardMail.subjectCharConvMap.containsKey(conf)){
+			this.subjectCharConv = SpmodeForwardMail.subjectCharConvMap.get(conf);
+		}else{
+			this.subjectCharConv = new CharacterConverter();
+		}
+		if(SpmodeForwardMail.goomojiSubjectCharConvMap!=null
+				&& SpmodeForwardMail.goomojiSubjectCharConvMap.containsKey(conf)){
+			this.goomojiSubjectCharConv = SpmodeForwardMail.goomojiSubjectCharConvMap.get(conf);
+		}else{
+			this.goomojiSubjectCharConv = new CharacterConverter();
+		}
+		if(SpmodeForwardMail.strConvMap!=null
+				&& SpmodeForwardMail.strConvMap.containsKey(conf)){
+			this.strConv = SpmodeForwardMail.strConvMap.get(conf);
+		}else{
+			this.strConv = new StringConverter();
+		}
 
 		// SMTP Server
 		this.setHostName(conf.getSmtpServer());
@@ -162,8 +184,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		}
 
 		// 文字列置換
-		this.plainBody = SpmodeForwardMail.strConv.convert(this.plainBody);
-		this.htmlBody = SpmodeForwardMail.strConv.convert(this.htmlBody);
+		this.plainBody = this.strConv.convert(this.plainBody);
+		this.htmlBody = this.strConv.convert(this.htmlBody);
 
 		Config.BodyEmojiReplace emojiReplace = conf.getBodyEmojiReplace();
 		if(emojiReplace==Config.BodyEmojiReplace.DontReplace){
@@ -175,8 +197,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		}else if(emojiReplace==Config.BodyEmojiReplace.ToLabel){
 			this.setBodyToLabel();
 		}else if(emojiReplace==Config.BodyEmojiReplace.ToSubjectTable){
-			this.plainBody = SpmodeForwardMail.subjectCharConv.convert(this.plainBody);
-			this.htmlBody = SpmodeForwardMail.subjectCharConv.convert(this.htmlBody);
+			this.plainBody = this.subjectCharConv.convert(this.plainBody);
+			this.htmlBody = this.subjectCharConv.convert(this.htmlBody);
 			this.setBodyDontReplace();
 		}
 	}
@@ -460,13 +482,13 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				subject = EmojiUtil.replaceToLabel(subject);
 			}
 
-			if(SpmodeForwardMail.goomojiSubjectCharConv != null){
-				String goomojiSubject = SpmodeForwardMail.goomojiSubjectCharConv.convert(subject);
+			if(this.goomojiSubjectCharConv != null){
+				String goomojiSubject = this.goomojiSubjectCharConv.convert(subject);
 				msg.setHeader("X-Goomoji-Source", "docomo_ne_jp");
 				msg.setHeader("X-Goomoji-Subject", Util.encodeGoomojiSubject(goomojiSubject));
 			}
 
-			subject = SpmodeForwardMail.subjectCharConv.convert(subject);
+			subject = this.subjectCharConv.convert(subject);
 			msg.setSubject(MimeUtility.encodeText(subject,this.charset,"B"));
 
 			if(this.conf.getContentTransferEncoding()!=null){
@@ -531,15 +553,15 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		return super.setSubject(Util.replaceUnicodeMapping(subject));
 	}
 
-	public static void setSubjectCharConv(CharacterConverter subjectCharConv) {
-		SpmodeForwardMail.subjectCharConv = subjectCharConv;
+	public static void setSubjectCharConv(Map<Config, CharacterConverter> subjectCharConvMap) {
+		SpmodeForwardMail.subjectCharConvMap = subjectCharConvMap;
 	}
 
-	public static void setGoomojiSubjectCharConv(CharacterConverter goomojiSubjectCharConv) {
-		SpmodeForwardMail.goomojiSubjectCharConv = goomojiSubjectCharConv;
+	public static void setGoomojiSubjectCharConv(Map<Config, CharacterConverter> goomojiSubjectCharConvMap) {
+		SpmodeForwardMail.goomojiSubjectCharConvMap = goomojiSubjectCharConvMap;
 	}
 
-	public static void setStrConv(StringConverter strConv) {
-		SpmodeForwardMail.strConv = strConv;
+	public static void setStrConv(Map<Config, StringConverter> strConvMap) {
+		SpmodeForwardMail.strConvMap = strConvMap;
 	}
 }

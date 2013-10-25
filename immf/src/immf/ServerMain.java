@@ -58,6 +58,9 @@ public class ServerMain {
 	public GrowlNotifier nmaNotifier;
 	public Map<Config, ForwardMailPicker> forwarders = new HashMap<Config, ForwardMailPicker>();
 	public Map<Config, List<String>> ignoreDomainsMap = new HashMap<Config, List<String>>();
+	private Map<Config, CharacterConverter> subjectCharConvMap = new HashMap<Config, CharacterConverter>();
+	private Map<Config, CharacterConverter> goomojiSubjectCharConvMap = new HashMap<Config, CharacterConverter>();
+	private Map<Config, StringConverter> strConvMap = new HashMap<Config, StringConverter>();
 	private SendMailPicker spicker;
 	private int numForwardSite;
 
@@ -103,40 +106,8 @@ public class ServerMain {
 		GoogleContactsAccessor.initialize(this.conf.getGmailId(), this.conf.getGmailPasswd());
 		this.client.setVcAddressBook(this.conf.getVcAddressFile());
 
-		CharacterConverter subjectCharConv = new CharacterConverter();
-		for (String file : conf.getForwardSubjectCharConvertFile()){
-			try {
-				subjectCharConv.load(new File(file));
-			} catch (Exception e) {
-				log.error("文字変換表("+file+")が読み込めませんでした。",e);
-			}
-		}
-		ImodeForwardMail.setSubjectCharConv(subjectCharConv);
-		SpmodeForwardMail.setSubjectCharConv(subjectCharConv);
-
-		if(conf.isForwardAddGoomojiSubject()){
-			CharacterConverter goomojiSubjectCharConv = new CharacterConverter();
-			if(conf.getForwardGoogleCharConvertFile()!=null) {
-				try {
-					goomojiSubjectCharConv.load(new File(conf.getForwardGoogleCharConvertFile()));
-				} catch (Exception e) {
-					log.error("文字変換表("+conf.getForwardGoogleCharConvertFile()+")が読み込めませんでした。",e);
-				}
-			}
-			ImodeForwardMail.setGoomojiSubjectCharConv(goomojiSubjectCharConv);
-			SpmodeForwardMail.setGoomojiSubjectCharConv(goomojiSubjectCharConv);
-		}
-
-		StringConverter strConv = new StringConverter();
-		if(conf.getForwardStringConvertFile()!=null) {
-			try {
-				strConv.load(new File(conf.getForwardStringConvertFile()));
-			} catch (Exception e) {
-				log.error("文字列変換表("+conf.getForwardStringConvertFile()+")が読み込めませんでした。",e);
-			}
-		}
-		ImodeForwardMail.setStrConv(strConv);
-		SpmodeForwardMail.setStrConv(strConv);
+		// 文字コード変換表読み込み
+		this.loadCharacterConversionMaps(this.conf, 1);
 
 		// 転送抑止ドメインリスト読み込み
 		this.loadIgnoreDomainList(this.conf, 1);
@@ -168,6 +139,9 @@ public class ServerMain {
 				forwardConf = new Config(is, i);
 				fpicker = new ForwardMailPicker(forwardConf, this);
 				forwarders.put(forwardConf, fpicker);
+				
+				// 文字コード変換表読み込み
+				this.loadCharacterConversionMaps(forwardConf, i);
 
 				// 転送抑止ドメインリスト読み込み
 				this.loadIgnoreDomainList(forwardConf, i);
@@ -178,6 +152,13 @@ public class ServerMain {
 				System.exit(1);
 			}
 		}
+		ImodeForwardMail.setSubjectCharConv(subjectCharConvMap);
+		ImodeForwardMail.setGoomojiSubjectCharConv(goomojiSubjectCharConvMap);
+		ImodeForwardMail.setStrConv(strConvMap);
+		SpmodeForwardMail.setSubjectCharConv(subjectCharConvMap);
+		SpmodeForwardMail.setGoomojiSubjectCharConv(goomojiSubjectCharConvMap);
+		SpmodeForwardMail.setStrConv(strConvMap);
+
 
 		// skype
 		this.skypeForwarder = new SkypeForwarder(conf.getForwardSkypeChat(),conf.getForwardSkypeSms(),conf);
@@ -250,6 +231,43 @@ public class ServerMain {
 		// XXX skypeForwarder?
 		// XXX imKayacNotifier?
 		this.appNotifications.push(message);
+	}
+
+	/*
+	 * 文字コード変換表読み込み
+	 */
+	private void loadCharacterConversionMaps(Config conf, int index) {
+		CharacterConverter subjectCharConv = new CharacterConverter();
+		for (String file : conf.getForwardSubjectCharConvertFile()){
+			try {
+				subjectCharConv.load(new File(file));
+			} catch (Exception e) {
+				log.error("文字変換表("+file+")が読み込めませんでした。",e);
+			}
+		}
+		subjectCharConvMap.put(conf, subjectCharConv);
+
+		if(conf.isForwardAddGoomojiSubject()){
+			CharacterConverter goomojiSubjectCharConv = new CharacterConverter();
+			if(conf.getForwardGoogleCharConvertFile()!=null) {
+				try {
+					goomojiSubjectCharConv.load(new File(conf.getForwardGoogleCharConvertFile()));
+				} catch (Exception e) {
+					log.error("文字変換表("+conf.getForwardGoogleCharConvertFile()+")が読み込めませんでした。",e);
+				}
+			}
+			goomojiSubjectCharConvMap.put(conf, goomojiSubjectCharConv);
+		}
+
+		StringConverter strConv = new StringConverter();
+		if(conf.getForwardStringConvertFile()!=null) {
+			try {
+				strConv.load(new File(conf.getForwardStringConvertFile()));
+			} catch (Exception e) {
+				log.error("文字列変換表("+conf.getForwardStringConvertFile()+")が読み込めませんでした。",e);
+			}
+		}
+		strConvMap.put(conf, strConv);
 	}
 
 	/*

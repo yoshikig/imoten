@@ -48,9 +48,12 @@ public class ImodeForwardMail extends MyHtmlEmail {
 	private static final Log log = LogFactory.getLog(ImodeForwardMail.class);
 	private ImodeMail imm;
 	private Config conf;
-	private static CharacterConverter subjectCharConv = null;
-	private static CharacterConverter goomojiSubjectCharConv = null;
-	private static StringConverter strConv = null;
+	private CharacterConverter subjectCharConv = null;
+	private CharacterConverter goomojiSubjectCharConv = null;
+	private StringConverter strConv = null;
+	private static Map<Config, CharacterConverter> subjectCharConvMap = null;
+	private static Map<Config, CharacterConverter> goomojiSubjectCharConvMap = null;
+	private static Map<Config, StringConverter> strConvMap = null;
 
 	public ImodeForwardMail(ImodeMail imm, Config conf) throws EmailException{
 		this.imm = imm;
@@ -59,6 +62,25 @@ public class ImodeForwardMail extends MyHtmlEmail {
 		this.setDebug(conf.isMailDebugEnable());
 		this.setCharset(this.conf.getMailEncode());
 		this.setContentTransferEncoding(this.conf.getContentTransferEncoding());
+
+		if(ImodeForwardMail.subjectCharConvMap!=null
+				&& ImodeForwardMail.subjectCharConvMap.containsKey(conf)){
+			this.subjectCharConv = ImodeForwardMail.subjectCharConvMap.get(conf);
+		}else{
+			this.subjectCharConv = new CharacterConverter();
+		}
+		if(ImodeForwardMail.goomojiSubjectCharConvMap!=null
+				&& ImodeForwardMail.goomojiSubjectCharConvMap.containsKey(conf)){
+			this.goomojiSubjectCharConv = ImodeForwardMail.goomojiSubjectCharConvMap.get(conf);
+		}else{
+			this.goomojiSubjectCharConv = new CharacterConverter();
+		}
+		if(ImodeForwardMail.strConvMap!=null
+				&& ImodeForwardMail.strConvMap.containsKey(conf)){
+			this.strConv = ImodeForwardMail.strConvMap.get(conf);
+		}else{
+			this.strConv = new StringConverter();
+		}
 
 		// SMTP Server
 		this.setHostName(conf.getSmtpServer());
@@ -115,7 +137,7 @@ public class ImodeForwardMail extends MyHtmlEmail {
 
 		// 文字列置換
 		if(this.imm.getFolderId()!=ImodeNetClient.FolderIdSent&&true){
-			this.imm.setBody(ImodeForwardMail.strConv.convert(this.imm.getBody()));
+			this.imm.setBody(this.strConv.convert(this.imm.getBody()));
 		}
 
 		Config.BodyEmojiReplace emojiReplace = conf.getBodyEmojiReplace();
@@ -128,7 +150,7 @@ public class ImodeForwardMail extends MyHtmlEmail {
 		}else if(emojiReplace==Config.BodyEmojiReplace.ToLabel){
 			this.setBodyToLabel();
 		}else if(emojiReplace==Config.BodyEmojiReplace.ToSubjectTable){
-			this.imm.setBody(ImodeForwardMail.subjectCharConv.convert(this.imm.getBody()));
+			this.imm.setBody(this.subjectCharConv.convert(this.imm.getBody()));
 			this.setBodyDontReplace();
 		}
 		// 添付ファイル
@@ -394,13 +416,13 @@ public class ImodeForwardMail extends MyHtmlEmail {
 				subject = EmojiUtil.replaceToLabel(subject);
 			}
 
-			if(ImodeForwardMail.goomojiSubjectCharConv != null){
-				String goomojiSubject = ImodeForwardMail.goomojiSubjectCharConv.convert(subject);
+			if(this.goomojiSubjectCharConv != null){
+				String goomojiSubject = this.goomojiSubjectCharConv.convert(subject);
 				msg.setHeader("X-Goomoji-Source", "docomo_ne_jp");
 				msg.setHeader("X-Goomoji-Subject", Util.encodeGoomojiSubject(goomojiSubject));
 			}
 
-			subject = ImodeForwardMail.subjectCharConv.convert(subject);
+			subject = this.subjectCharConv.convert(subject);
 			msg.setSubject(MimeUtility.encodeText(subject,this.charset,"B"));
 
 			if(this.conf.getContentTransferEncoding()!=null){
@@ -465,15 +487,15 @@ public class ImodeForwardMail extends MyHtmlEmail {
 		return super.setSubject(Util.replaceUnicodeMapping(subject));
 	}
 
-	public static void setSubjectCharConv(CharacterConverter subjectCharConv) {
-		ImodeForwardMail.subjectCharConv = subjectCharConv;
+	public static void setSubjectCharConv(Map<Config, CharacterConverter> subjectCharConvMap) {
+		ImodeForwardMail.subjectCharConvMap = subjectCharConvMap;
 	}
 
-	public static void setGoomojiSubjectCharConv(CharacterConverter goomojiSubjectCharConv) {
-		ImodeForwardMail.goomojiSubjectCharConv = goomojiSubjectCharConv;
+	public static void setGoomojiSubjectCharConv(Map<Config, CharacterConverter> goomojiSubjectCharConvMap) {
+		ImodeForwardMail.goomojiSubjectCharConvMap = goomojiSubjectCharConvMap;
 	}
 
-	public static void setStrConv(StringConverter strConv) {
-		ImodeForwardMail.strConv = strConv;
+	public static void setStrConv(Map<Config, StringConverter> strConvMap) {
+		ImodeForwardMail.strConvMap = strConvMap;
 	}
 }
