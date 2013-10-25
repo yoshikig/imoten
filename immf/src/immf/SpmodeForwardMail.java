@@ -448,7 +448,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					msg.setHeader("Cc", InternetAddress.toString(smmCcAddrList.toArray(new InternetAddress[0])));
 				}
 				if(smmReplyToAddrList.size()>0){
-					msg.setHeader("Reply-To", InternetAddress.toString(smmCcAddrList.toArray(new InternetAddress[0])));
+					msg.setHeader("Reply-To", InternetAddress.toString(smmReplyToAddrList.toArray(new InternetAddress[0])));
 				}
 
 				msg.setFrom(smmFromAddr);
