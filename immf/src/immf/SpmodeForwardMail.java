@@ -69,6 +69,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private static Map<Config, CharacterConverter> subjectCharConvMap = null;
 	private static Map<Config, CharacterConverter> goomojiSubjectCharConvMap = null;
 	private static Map<Config, StringConverter> strConvMap = null;
+	private StringBuilder headerInfo = new StringBuilder();
 
 	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
 		this.smm = sm;
@@ -155,6 +156,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			// XXX ImodeNetClient.java getMail() アドレス帳との連携は未
 			// From:
 			smmFromAddr = (InternetAddress) smm.getFrom()[0];
+			headerInfo.append(" From:    ").append(smmFromAddr.toUnicodeString()).append("\r\n");
 			// ReplyTo:
 			Address[] addrsReplyTo = smm.getReplyTo();
 			if (addrsReplyTo != null){
@@ -164,17 +166,50 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}
 			// To:
 			Address[] addrsTo = smm.getRecipients(Message.RecipientType.TO);
+			String label = " To:";
+			boolean bccLabel = true;
 			if (addrsTo != null){
 				for (int i = 0; i < addrsTo.length; i++) {
-					smmToAddrList.add((InternetAddress) addrsTo[i]);
+					InternetAddress addr = (InternetAddress) addrsTo[i];
+					smmToAddrList.add(addr);
+					headerInfo.append(label + "      ").append(addr.toUnicodeString()).append("\r\n");
+					label="    ";
+					if (bccLabel && addr.getAddress().equalsIgnoreCase(conf.getSpmodeMailAddr())){
+						bccLabel = false;
+					}
 				}
 			}
 			// Cc:
 			Address[] addrsCc = smm.getRecipients(Message.RecipientType.CC);
+			label = " Cc:";
 			if (addrsCc != null){
 				for (int i = 0; i < addrsCc.length; i++) {
-					smmCcAddrList.add((InternetAddress) addrsCc[i]);
+					InternetAddress addr = (InternetAddress) addrsCc[i];
+					smmCcAddrList.add(addr);
+					headerInfo.append(label + "      ").append(addr.toUnicodeString()).append("\r\n");
+					label="    ";
+					if (bccLabel && addr.getAddress().equalsIgnoreCase(conf.getSpmodeMailAddr())){
+						bccLabel = false;
+					}
 				}
+			}
+			// その他ヘッダ情報
+			if(bccLabel){
+				headerInfo.append(" Bcc:     ").append(conf.getSpmodeMailAddr()).append("\r\n");
+			}
+			SimpleDateFormat df = new SimpleDateFormat("yyyy/MM/dd (EEE) HH:mm:ss");
+			if(smmDate!=null){
+				headerInfo.append(" Date:    ").append(df.format(smmDate)).append("\r\n");
+			}else{
+				headerInfo.append(" Date:    (取得エラー)\r\n");
+			}
+			if(conf.isSubjectEmojiReplace()){
+				headerInfo.append(" Subject: ").append(EmojiUtil.replaceToLabel(smmSubject)).append("\r\n");
+			}else{
+				headerInfo.append(" Subject: ").append(smmSubject).append("\r\n");
+			}
+			if(conf.getConfigId() == 1){
+				log.info("spモードメールを転送\n"+headerInfo);
 			}
 
 			// メールを分解
@@ -270,18 +305,21 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	}
 	private void setBodyDontReplace(String plainText, String html) throws EmailException{
 
-		// XXX いったん省略
 		// html
-		//if(conf.isHeaderToBody()){
-		//	html = html.replaceAll("(<body[^>]*>)", "$1"+Util.getHeaderInfo(this.imm, true, this.conf.isSubjectEmojiReplace(), conf));
-		//}
+		if(conf.isHeaderToBody()){
+			if(html.matches(".*<body[^>]*>.*")){
+				html = html.replaceAll("(<body[^>]*>)", "$1"+Util.getHeaderInfo(this.headerInfo.toString(), true, conf));
+			}else{
+				html = "<body>" + Util.getHeaderInfo(this.headerInfo.toString(), true, conf) + html + "</body>";
+			}
+		}
 
 		// テキスト
-		//if(conf.isHeaderToBody()){
-		//	plainText = Util.getHeaderInfo(this.imm, false, this.conf.isSubjectEmojiReplace(), conf)+plainText;
-		//}
+		if(conf.isHeaderToBody()){
+			plainText = Util.getHeaderInfo(this.headerInfo.toString(), false, conf)+plainText;
+		}
 
-		//html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
+		html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		try{
 			this.setHtmlMsg(html);
 			if(conf.isMailAlternative()||this.hasPlain){

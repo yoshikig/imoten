@@ -564,6 +564,10 @@ public class Config {
 		return docomoPasswd;
 	}
 
+	public String getSpmodeMailAddr() {
+		return spmodeMailAddr;
+	}
+
 	public String getSpmodeMailUser() {
 		if(spmodeMailAddr!=null){
 			return spmodeMailAddr.split("@")[0];

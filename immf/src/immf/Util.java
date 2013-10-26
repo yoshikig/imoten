@@ -35,6 +35,7 @@ import java.util.Iterator;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Part;
 import javax.mail.internet.ContentDisposition;
@@ -464,6 +465,30 @@ public class Util {
 			buf.append(Util.easyEscapeHtml(header.toString()));
 		}else{
 			buf.append(header.toString());
+		}
+		buf.append("----").append("\r\n");
+		if(isHtml){
+			buf.append("</pre>");
+		}
+		buf.append("\r\n");
+		return buf.toString();
+	}
+	public static String getHeaderInfo(String mm, boolean isHtml, Config conf){
+		StringBuilder buf = new StringBuilder();
+
+		if(isHtml){
+			String fontfamily = conf.getMailFontFamily();
+			if(fontfamily!=null){
+				buf.append("<pre style=\"white-space:pre-wrap;word-wrap:break-word;font-family:\'"+fontfamily+"\';\">");
+			}else{
+				buf.append("<pre style=\"white-space:pre-wrap;word-wrap:break-word;\">");
+			}
+		}
+		buf.append("----").append("\r\n");
+		if(isHtml){
+			buf.append(Util.easyEscapeHtml(mm));
+		}else{
+			buf.append(mm);
 		}
 		buf.append("----").append("\r\n");
 		if(isHtml){
