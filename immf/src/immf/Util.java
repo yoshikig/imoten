@@ -407,6 +407,29 @@ public class Util {
 		Source src = new Source(html);
 		return src.getRenderer().toString();
 	}
+
+	public static byte[] inputstream2bytes(InputStream is) throws IOException{
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		try{
+			byte[] buf = new byte[1024 * 4];
+			while(true){
+				int len = is.read(buf);
+				if(len<=0){
+					break;
+				}
+				bos.write(buf,0,len);
+			}
+		}finally{
+			try{
+				is.close();
+			}catch (Exception e) {}
+			try{
+				bos.close();
+			}catch (Exception e) {}
+		}
+		return bos.toByteArray();
+	}
+
 	/*
 	 * From,CCなどの情報をBodyの先頭に付加する場合の文字列
 	 */

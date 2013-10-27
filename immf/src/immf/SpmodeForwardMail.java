@@ -40,9 +40,12 @@ import javax.mail.Multipart;
 import javax.mail.Part;
 import javax.mail.Session;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.InternetHeaders;
+import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeUtility;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -265,7 +268,25 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}
 		} else {
 			String disposition = p.getDisposition();
-			getContainer().addBodyPart((BodyPart)p);
+			try{
+				getContainer().addBodyPart((BodyPart)p);
+			}catch(ClassCastException e){
+				// メールがマルチパートではなく本文が添付ファイルだけの場合は、マルチパートにして添付ファイルをつける
+				try {
+					InternetHeaders newPartHeader = new InternetHeaders();
+					newPartHeader.setHeader("Content-Type", p.getContentType());
+					if(disposition != null){
+						newPartHeader.setHeader("Content-Disposition", p.getDisposition());
+					}
+					newPartHeader.setHeader("Content-Transfer-Encoding", "base64");
+					byte contentData[] = Util.inputstream2bytes(p.getInputStream());
+					byte b64data[] = Base64.encodeBase64(contentData);
+					MimeBodyPart newPart = new MimeBodyPart(newPartHeader, b64data);
+					getContainer().addBodyPart((BodyPart)newPart);
+				} catch (IOException ie) {
+					log.error("未知のエラー",ie);
+				}
+			}
 			// information
 			log.info("添付ファイル追加");
 			if (disposition != null && disposition.equals(Part.INLINE)) {

@@ -418,11 +418,11 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 						file.setContentType("image/gif");
 						fname = fname+".gif";
 						fname2 = getBasename(fname2)+".gif";
-						file.setData(inputstream2bytes(Util.png2gif(bp.getInputStream())));
+						file.setData(Util.inputstream2bytes(Util.png2gif(bp.getInputStream())));
 					}else{
 						file.setContentType(contentType);
 						fname = fname+"."+getSubtype(contentType);
-						file.setData(inputstream2bytes(bp.getInputStream()));
+						file.setData(Util.inputstream2bytes(bp.getInputStream()));
 					}
 
 					file.setInline(true);
@@ -455,10 +455,10 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 					if(getSubtype(contentType).equalsIgnoreCase("png")){
 						file.setContentType("image/gif");
 						file.setFilename(getBasename(fname)+".gif");
-						file.setData(inputstream2bytes(Util.png2gif(bp.getInputStream())));
+						file.setData(Util.inputstream2bytes(Util.png2gif(bp.getInputStream())));
 					}else{
 						file.setFilename(fname);
-						file.setData(inputstream2bytes(bp.getInputStream()));
+						file.setData(Util.inputstream2bytes(bp.getInputStream()));
 					}
 					if(!sendMail.checkAttachmentCapability(file)){
 						limiterr = true;
@@ -545,11 +545,11 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 						file.setContentType("image/gif");
 						fname = fname+".gif";
 						fname2 = getBasename(fname2)+".gif";
-						file.setData(inputstream2bytes(Util.png2gif(bp.getInputStream())));
+						file.setData(Util.inputstream2bytes(Util.png2gif(bp.getInputStream())));
 					}else{
 						file.setContentType(contentType);
 						fname = fname+"."+getSubtype(contentType);
-						file.setData(inputstream2bytes(bp.getInputStream()));
+						file.setData(Util.inputstream2bytes(bp.getInputStream()));
 					}
 
 					file.setInline(true);
@@ -625,10 +625,10 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 						if(getSubtype(contentType).equalsIgnoreCase("png")){
 							file.setContentType("image/gif");
 							file.setFilename(getBasename(fname)+".gif");
-							file.setData(inputstream2bytes(Util.png2gif(bp.getInputStream())));
+							file.setData(Util.inputstream2bytes(Util.png2gif(bp.getInputStream())));
 						}else{
 							file.setFilename(fname);
-							file.setData(inputstream2bytes(bp.getInputStream()));
+							file.setData(Util.inputstream2bytes(bp.getInputStream()));
 						}
 						if(!sendMail.checkAttachmentCapability(file)){
 							limiterr = true;
@@ -662,27 +662,6 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 	private static String uniqId(){
 		fileNameId++;
 		return System.currentTimeMillis()+"_"+fileNameId;
-	}
-	private static byte[] inputstream2bytes(InputStream is) throws IOException{
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		try{
-			byte[] buf = new byte[1024 * 4];
-			while(true){
-				int len = is.read(buf);
-				if(len<=0){
-					break;
-				}
-				bos.write(buf,0,len);
-			}
-		}finally{
-			try{
-				is.close();
-			}catch (Exception e) {}
-			try{
-				bos.close();
-			}catch (Exception e) {}
-		}
-		return bos.toByteArray();
 	}
 
 	private static List<InternetAddress> getBccRecipients(List<String> allRecipients, List<InternetAddress> to, List<InternetAddress> cc) throws AddressException{
