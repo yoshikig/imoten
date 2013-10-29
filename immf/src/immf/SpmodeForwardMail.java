@@ -43,7 +43,6 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
-import javax.mail.internet.MimeMultipart;
 import javax.mail.internet.MimeUtility;
 
 import org.apache.commons.codec.binary.Base64;
@@ -58,10 +57,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private Message smm;
 	private String plainBody = "";
 	private String htmlBody = "";
-	private String keyPlainBody = "";
-	private String keyHtmlBody = "";
-	private String optionPlainMsg = "";
-	private String optionHtmlMsg = "";
 	private String smmSubject;
 	private Date smmDate;
 	private InternetAddress smmFromAddr;
@@ -78,7 +73,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private static Map<Config, CharacterConverter> goomojiSubjectCharConvMap = null;
 	private static Map<Config, StringConverter> strConvMap = null;
 	private StringBuilder headerInfo = new StringBuilder();
-	private Map<String, String> bodyMap = new HashMap<String, String>();
 
 	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
 		this.smm = sm;
@@ -221,21 +215,12 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				log.info("spモードメールを転送\n"+headerInfo);
 			}
 
-			try {
-				byte contentData[] = Util.inputstream2bytes(smm.getInputStream());
-				log.debug("Content-Type:"+smm.getContentType());
-				log.debug("Content[\n"+new String(contentData)+"\n]");
-			} catch (IOException e) {}
-
-			// テキストパートを取得
-			parseTextPart(smm);
+			// メールを分解
+			parsePart(smm);
 		} catch (MessagingException e) {
-			log.error(e);
+			
 		}
 
-		this.plainBody += this.optionPlainMsg;
-		this.htmlBody += this.optionHtmlMsg;
-		
 		// 文字列置換
 		this.plainBody = this.strConv.convert(this.plainBody);
 		this.htmlBody = this.strConv.convert(this.htmlBody);
@@ -254,22 +239,13 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			this.htmlBody = this.subjectCharConv.convert(this.htmlBody);
 			this.setBodyDontReplace();
 		}
-		
-		// メールを分解して新しいメッセージの組み立て
-		try{
-			parsePart(smm, getContainer());
-		}catch (MessagingException e){
-			log.error(e);
-		}
 	}
 
-	private boolean parseTextPart(Part p) throws MessagingException{
-		boolean isInlineImage = false;
+	private void parsePart(Part p) throws MessagingException {
 		if (this.plainBody.isEmpty() && p.isMimeType("text/plain")) {
 			this.hasPlain = true;
 			try {
 				this.plainBody = p.getContent().toString();
-				this.keyPlainBody = this.plainBody;
 			} catch (IOException io) {
 				this.plainBody = "";
 			}
@@ -277,7 +253,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			this.decomeFlg = true;
 			try {
 				this.htmlBody = p.getContent().toString();
-				this.keyHtmlBody = this.htmlBody;
 			} catch (IOException IO) {
 				this.htmlBody = "";
 			}
@@ -286,104 +261,15 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			try {
 				mp = (Multipart)p.getContent();
 			} catch (IOException e) {
-				return false;
-			}
-			//for (int i = 0; i < mp.getCount(); i++) {
-			//	parseTextPart(mp.getBodyPart(i));
-			//}
-			// 以下、後述するrelatedのために conf.isForwardFixMultipartRelated() のためのコード
-			boolean decome = false;
-			for (int i = 0; i < mp.getCount(); i++) {
-				boolean inlineParsed = parseTextPart(mp.getBodyPart(i));
-				decome = inlineParsed || decome;
-				if (decome && !inlineParsed && conf.isForwardFixMultipartRelated()){
-					this.optionPlainMsg = "\n\n---\n[添付ファイルあり（非表示の可能性あり）]";
-					this.optionHtmlMsg = "<div></div><hr><div>[添付ファイルあり（非表示の可能性あり）]</div>";
-				}
-			}
-
-		} else {
-			if(p instanceof MimeBodyPart){
-				if(((MimeBodyPart)p).getContentID()!=null){
-					isInlineImage = true;
-				}
-			}
-			String disposition = p.getDisposition();
-			if (disposition != null && disposition.equals(Part.INLINE)) {
-				isInlineImage = true;
-			}
-		}
-		return isInlineImage;
-	}
-	private boolean parsePart(Part p, MimeMultipart parentPart) throws MessagingException{
-		boolean isInlineImage = false;
-		log.info("parsing: "+p.getContentType());
-		if (p.isMimeType("text/plain")) {
-			String text = ""; 
-			try {
-				text = p.getContent().toString();
-			} catch (IOException io) {
-				text = "";
-			}
-			MimeBodyPart thisPart = new MimeBodyPart();
-			thisPart.setText(bodyMap.get(text), this.charset, "plain");
-			thisPart.setHeader("Content-Transfer-Encoding", "base64");
-			parentPart.addBodyPart(thisPart);
-			
-		} else if (p.isMimeType("text/html")) {
-			String html = "";
-			try {
-				html = p.getContent().toString();
-			} catch (IOException IO) {
-				html = "";
-			}
-			MimeBodyPart thisPart = new MimeBodyPart();
-			thisPart.setText(bodyMap.get(html), this.charset, "html");
-			thisPart.setHeader("Content-Transfer-Encoding", "base64");
-			parentPart.addBodyPart(thisPart);
-			
-		} else if (p.isMimeType("multipart/*")) {
-			String subtype = getSubtype(p.getContentType());
-			MimeMultipart newMimeMultipart = new MimeMultipart(subtype);
-
-			Multipart mp;
-			boolean decome = false;
-			try{
-				mp = (Multipart)p.getContent();
-			} catch (IOException ie) {
-				return false;
+				return;
 			}
 			for (int i = 0; i < mp.getCount(); i++) {
-				decome = parsePart(mp.getBodyPart(i),newMimeMultipart) || decome;
+				parsePart(mp.getBodyPart(i));
 			}
-
-			if (decome && conf.isForwardFixMultipartRelated()){
-				/*
-				 * XXX
-				 *  spモードメールのpopサーバに格納された時点で送信元が related で送っていても
-				 *  multipart/related が multipart/mixed に変換されている模様。
-				 *  iPhoneの MobileMail.app は multipart/mixed にある添付ファイルはインラインでも
-				 *  添付ファイル扱いをしてしまうので本文と添付ファイルと二重に表示される。
-				 *  iPhoneは逆に related に含まれる添付ファイルは通常の添付ファイルでも表示しないバグがあるため注意文挿入。
-				 */
-				log.info(subtype+"->related 強制変更");
-				newMimeMultipart.setSubType("related");
-			}
-			MimeBodyPart newPart = new MimeBodyPart();
-			newPart.setContent(newMimeMultipart);
-			if (newMimeMultipart.getCount()>0){
-				parentPart.addBodyPart(newPart);
-			}
-
 		} else {
 			String disposition = p.getDisposition();
 			try{
-				parentPart.addBodyPart((BodyPart)p);
-				if(p instanceof MimeBodyPart){
-					if(((MimeBodyPart)p).getContentID()!=null){
-						isInlineImage = true;
-					}
-				}
+				getContainer().addBodyPart((BodyPart)p);
 			}catch(ClassCastException e){
 				// メールがマルチパートではなく本文が添付ファイルだけの場合は、マルチパートにして添付ファイルをつける
 				try {
@@ -396,7 +282,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					byte contentData[] = Util.inputstream2bytes(p.getInputStream());
 					byte b64data[] = Base64.encodeBase64(contentData);
 					MimeBodyPart newPart = new MimeBodyPart(newPartHeader, b64data);
-					parentPart.addBodyPart((BodyPart)newPart);
+					getContainer().addBodyPart((BodyPart)newPart);
 				} catch (IOException ie) {
 					log.error("未知のエラー",ie);
 				}
@@ -407,7 +293,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// インライン添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
 				log.info("Content-Disposition: INLINE");
-				isInlineImage = true;
 			} else if (disposition != null && disposition.equals(Part.ATTACHMENT)) {
 				// 添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
@@ -417,16 +302,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				log.info("Content-Type: "+p.getContentType());
 			}
 		}
-		return isInlineImage;
-	}
-
-	private static String getSubtype(String contenttype){
-		try{
-			String r = contenttype.split("\\r?\\n")[0];
-			return r.split("/")[1].replaceAll("\\s*;.*", "");
-		}catch (Exception e) {
-		}
-		return "";
 	}
 
 	/*
@@ -467,11 +342,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 
 		html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		try{
-			//this.setHtmlMsg(html);
-			this.setHtml(html);
+			this.setHtmlMsg(html);
 			if(conf.isMailAlternative()||this.hasPlain){
-				//this.setTextMsg(plainText);
-				this.setText(plainText);
+				this.setTextMsg(plainText);
 			}
 		}catch (Exception e) {
 			throw new EmailException(e);
@@ -588,21 +461,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		}
 		this.setBodyDontReplace(plain,html);
-	}
-
-	// MimeMultipartの親子関係が保てないのでHtmlEmailのsetTextMsg,setHtmlMsgは使用しない 
-	private void setText(String text){
-		bodyMap.put(this.keyPlainBody, text);
-	}
-	private void setHtml(String html){
-		html = Util.replaceUnicodeMapping(html);
-		html += "\n";
-		try{
-			html = new String(html.getBytes(this.charset));
-		}catch (Exception e) {
-			log.error("setHtmlMsg",e);
-		}
-		bodyMap.put(this.keyHtmlBody, html);
 	}
 
 	@Override
