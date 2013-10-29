@@ -83,6 +83,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private Map<String, String> bodyMap = new HashMap<String, String>();
 	private Map<URL, String> emojiToCid = new HashMap<URL, String>();
 	private Map<URL, String> emojiToCode = new HashMap<URL, String>();
+	private MimeMultipart rootMultipart = null;
+	private List<BodyPart> attachedParts = new ArrayList<BodyPart>();
 
 	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
 		this.smm = sm;
@@ -260,15 +262,29 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		}
 		
 		// メールを分解して新しいメッセージの組み立て
+		if(conf.isForwardFixMultipartRelated()){
+			log.info("forward.spmode.fixinlineattach:有効");
+		}else{
+			log.info("forward.spmode.fixinlineattach:無効");
+		}
 		try{
 			parsePart(smm, getContainer());
+			
+			// インラインではない添付ファイルを拾って一番外側のパートに格納
+			if(conf.isForwardFixMultipartRelated()){
+				if(getSubtype(smm.getContentType()).equalsIgnoreCase("mixed")){
+					rootMultipart = getContainer();
+				}
+				for(BodyPart p : attachedParts) {
+					parsePart(p, rootMultipart);
+				}
+			}
 		}catch (MessagingException e){
 			log.error(e);
 		}
 	}
 
-	private boolean parseTextPart(Part p) throws MessagingException{
-		boolean isInlineImage = false;
+	private void parseTextPart(Part p) throws MessagingException{
 		if (this.plainBody.isEmpty() && p.isMimeType("text/plain")) {
 			this.hasPlain = true;
 			try {
@@ -290,34 +306,12 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			try {
 				mp = (Multipart)p.getContent();
 			} catch (IOException e) {
-				return false;
+				return;
 			}
-			//for (int i = 0; i < mp.getCount(); i++) {
-			//	parseTextPart(mp.getBodyPart(i));
-			//}
-			// 以下、後述するrelatedのために conf.isForwardFixMultipartRelated() のためのコード
-			boolean decome = false;
 			for (int i = 0; i < mp.getCount(); i++) {
-				boolean inlineParsed = parseTextPart(mp.getBodyPart(i));
-				decome = inlineParsed || decome;
-				if (decome && !inlineParsed && conf.isForwardFixMultipartRelated()){
-					this.optionPlainMsg = "\n\n---\n[添付ファイルあり（非表示の可能性あり）]";
-					this.optionHtmlMsg = "<div></div><hr><div>[添付ファイルあり（非表示の可能性あり）]</div>";
-				}
-			}
-
-		} else {
-			if(p instanceof MimeBodyPart){
-				if(((MimeBodyPart)p).getContentID()!=null){
-					isInlineImage = true;
-				}
-			}
-			String disposition = p.getDisposition();
-			if (disposition != null && disposition.equals(Part.INLINE)) {
-				isInlineImage = true;
+				parseTextPart(mp.getBodyPart(i));
 			}
 		}
-		return isInlineImage;
 	}
 	private boolean parsePart(Part p, MimeMultipart parentPart) throws MessagingException{
 		boolean isInlineImage = false;
@@ -332,7 +326,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			MimeBodyPart thisPart = new MimeBodyPart();
 			thisPart.setText(bodyMap.get(text), this.charset, "plain");
 			thisPart.setHeader("Content-Transfer-Encoding", "base64");
-
+			log.info("PLAIN Part["+bodyMap.get(text)+"]");
+			
 			// 絵文字があった場合にマルチパートを作成して絵文字を挟み込む
 			boolean emoji = false;
 			if(emojiToCid.size()>0){
@@ -353,6 +348,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					MimeBodyPart htmlPart = new MimeBodyPart();
 					htmlPart.setText(html, this.charset, "html");
 					htmlPart.setHeader("Content-Transfer-Encoding", "base64");
+					log.info("HTML Part(created)["+html+"]");
+
 					newMimeMultipartAlt.addBodyPart(thisPart);
 					newMimeMultipartAlt.addBodyPart(htmlPart);
 					newPartAlt.setContent(newMimeMultipartAlt);
@@ -360,17 +357,17 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 						newMimeMultipartRelated.addBodyPart(newPartAlt);
 						
 						for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
-							log.info("here4");
 							URL url = e.getKey();
 							String cid = e.getValue();
-							String code = emojiToCode.get(url);
+							String name = emojiToCode.get(url);
 
 							MimeBodyPart mbp = new MimeBodyPart();
 							mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
-							mbp.setFileName(code);
+							mbp.setFileName(name);
 							mbp.setDisposition("inline");
 							mbp.setContentID("<" + cid + ">");
 							
+							log.info("絵文字追加:"+name);
 							newMimeMultipartRelated.addBodyPart(mbp);
 						}
 						parentPart.addBodyPart(newPartRelated);
@@ -393,11 +390,15 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			MimeBodyPart thisPart = new MimeBodyPart();
 			thisPart.setText(bodyMap.get(html), this.charset, "html");
 			thisPart.setHeader("Content-Transfer-Encoding", "base64");
+			log.info("HTML Part["+bodyMap.get(html)+"]");
 			parentPart.addBodyPart(thisPart);
 			
 		} else if (p.isMimeType("multipart/*")) {
 			String subtype = getSubtype(p.getContentType());
 			MimeMultipart newMimeMultipart = new MimeMultipart(subtype);
+			if(this.rootMultipart==null){
+				this.rootMultipart = newMimeMultipart;
+			}
 
 			Multipart mp;
 			boolean decome = false;
@@ -409,11 +410,28 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				return false;
 			}
 			for (int i = 0; i < mp.getCount(); i++) {
-				String childContentType = mp.getBodyPart(i).getContentType();
-				if(getSubtype(childContentType).equalsIgnoreCase("alternative")){
+				BodyPart childBodyPart = mp.getBodyPart(i);
+
+				boolean inlineParsed = parsePart(childBodyPart,newMimeMultipart);
+				
+				// インライン添付ファイルがあったかどうか
+				decome = inlineParsed || decome;
+
+				// multipart/alternative があったかどうか
+				String childContentType = childBodyPart.getContentType();
+				String childSubType = getSubtype(childContentType);
+				if(childSubType.equalsIgnoreCase("alternative")){
 					alternative = true;
 				}
-				decome = parsePart(mp.getBodyPart(i),newMimeMultipart) || decome;
+
+				// インラインではない添付ファイルを related の外に出すための処理
+				if(!inlineParsed && conf.isForwardFixMultipartRelated()){
+					log.info("move part: "+childBodyPart.getFileName());
+					if(!childContentType.startsWith("multipart/") && !childContentType.startsWith("text/")) {
+						newMimeMultipart.removeBodyPart(childBodyPart);
+						attachedParts.add(childBodyPart);
+					}
+				}
 			}
 
 			// すでにあるインライン添付ファイルか multipart/alternative と同じ階層に絵文字を挟み込む
@@ -442,6 +460,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					mbp.setDisposition("inline");
 					mbp.setContentID("<" + cid + ">");
 					
+					log.info("絵文字追加:"+code);
 					newMimeMultipart.addBodyPart(mbp);
 				}
 
