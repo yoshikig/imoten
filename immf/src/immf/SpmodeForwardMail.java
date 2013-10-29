@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import javax.activation.DataHandler;
+import javax.activation.URLDataSource;
 import javax.mail.Address;
 import javax.mail.BodyPart;
 import javax.mail.Message;
@@ -43,6 +45,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
 import javax.mail.internet.MimeUtility;
 
 import org.apache.commons.codec.binary.Base64;
@@ -57,6 +60,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private Message smm;
 	private String plainBody = "";
 	private String htmlBody = "";
+	private String keyPlainBody = "";
+	private String keyHtmlBody = "";
+	private String optionPlainMsg = "";
+	private String optionHtmlMsg = "";
 	private String smmSubject;
 	private Date smmDate;
 	private InternetAddress smmFromAddr;
@@ -73,6 +80,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private static Map<Config, CharacterConverter> goomojiSubjectCharConvMap = null;
 	private static Map<Config, StringConverter> strConvMap = null;
 	private StringBuilder headerInfo = new StringBuilder();
+	private Map<String, String> bodyMap = new HashMap<String, String>();
+	private Map<URL, String> emojiToCid = new HashMap<URL, String>();
+	private Map<URL, String> emojiToCode = new HashMap<URL, String>();
 
 	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
 		this.smm = sm;
@@ -215,12 +225,21 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				log.info("spモードメールを転送\n"+headerInfo);
 			}
 
-			// メールを分解
-			parsePart(smm);
+			try {
+				byte contentData[] = Util.inputstream2bytes(smm.getInputStream());
+				log.debug("Content-Type:"+smm.getContentType());
+				log.debug("Content[\n"+new String(contentData)+"\n]");
+			} catch (IOException e) {}
+
+			// テキストパートを取得
+			parseTextPart(smm);
 		} catch (MessagingException e) {
-			
+			log.error(e);
 		}
 
+		this.plainBody += this.optionPlainMsg;
+		this.htmlBody += this.optionHtmlMsg;
+		
 		// 文字列置換
 		this.plainBody = this.strConv.convert(this.plainBody);
 		this.htmlBody = this.strConv.convert(this.htmlBody);
@@ -239,13 +258,22 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			this.htmlBody = this.subjectCharConv.convert(this.htmlBody);
 			this.setBodyDontReplace();
 		}
+		
+		// メールを分解して新しいメッセージの組み立て
+		try{
+			parsePart(smm, getContainer());
+		}catch (MessagingException e){
+			log.error(e);
+		}
 	}
 
-	private void parsePart(Part p) throws MessagingException {
+	private boolean parseTextPart(Part p) throws MessagingException{
+		boolean isInlineImage = false;
 		if (this.plainBody.isEmpty() && p.isMimeType("text/plain")) {
 			this.hasPlain = true;
 			try {
 				this.plainBody = p.getContent().toString();
+				this.keyPlainBody = this.plainBody;
 			} catch (IOException io) {
 				this.plainBody = "";
 			}
@@ -253,6 +281,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			this.decomeFlg = true;
 			try {
 				this.htmlBody = p.getContent().toString();
+				this.keyHtmlBody = this.htmlBody;
 			} catch (IOException IO) {
 				this.htmlBody = "";
 			}
@@ -261,15 +290,178 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			try {
 				mp = (Multipart)p.getContent();
 			} catch (IOException e) {
-				return;
+				return false;
+			}
+			//for (int i = 0; i < mp.getCount(); i++) {
+			//	parseTextPart(mp.getBodyPart(i));
+			//}
+			// 以下、後述するrelatedのために conf.isForwardFixMultipartRelated() のためのコード
+			boolean decome = false;
+			for (int i = 0; i < mp.getCount(); i++) {
+				boolean inlineParsed = parseTextPart(mp.getBodyPart(i));
+				decome = inlineParsed || decome;
+				if (decome && !inlineParsed && conf.isForwardFixMultipartRelated()){
+					this.optionPlainMsg = "\n\n---\n[添付ファイルあり（非表示の可能性あり）]";
+					this.optionHtmlMsg = "<div></div><hr><div>[添付ファイルあり（非表示の可能性あり）]</div>";
+				}
+			}
+
+		} else {
+			if(p instanceof MimeBodyPart){
+				if(((MimeBodyPart)p).getContentID()!=null){
+					isInlineImage = true;
+				}
+			}
+			String disposition = p.getDisposition();
+			if (disposition != null && disposition.equals(Part.INLINE)) {
+				isInlineImage = true;
+			}
+		}
+		return isInlineImage;
+	}
+	private boolean parsePart(Part p, MimeMultipart parentPart) throws MessagingException{
+		boolean isInlineImage = false;
+		log.info("parsing: "+p.getContentType());
+		if (p.isMimeType("text/plain")) {
+			String text = ""; 
+			try {
+				text = p.getContent().toString();
+			} catch (IOException io) {
+				text = "";
+			}
+			MimeBodyPart thisPart = new MimeBodyPart();
+			thisPart.setText(bodyMap.get(text), this.charset, "plain");
+			thisPart.setHeader("Content-Transfer-Encoding", "base64");
+
+			// 絵文字があった場合にマルチパートを作成して絵文字を挟み込む
+			boolean emoji = false;
+			if(emojiToCid.size()>0){
+				emoji = true;
+			}
+			
+			MimeMultipart newMimeMultipartRelated = new MimeMultipart("related");
+			MimeBodyPart newPartRelated = new MimeBodyPart();
+			newPartRelated.setContent(newMimeMultipartRelated);
+
+			if(!decomeFlg){
+				// 元メールがテキスト形式だった場合
+				String html = bodyMap.get("<html>"+text);
+				if(html!=null & !html.isEmpty()){
+					MimeMultipart newMimeMultipartAlt = new MimeMultipart("alternative");
+					MimeBodyPart newPartAlt = new MimeBodyPart();
+					
+					MimeBodyPart htmlPart = new MimeBodyPart();
+					htmlPart.setText(html, this.charset, "html");
+					htmlPart.setHeader("Content-Transfer-Encoding", "base64");
+					newMimeMultipartAlt.addBodyPart(thisPart);
+					newMimeMultipartAlt.addBodyPart(htmlPart);
+					newPartAlt.setContent(newMimeMultipartAlt);
+					if(emoji){
+						newMimeMultipartRelated.addBodyPart(newPartAlt);
+						
+						for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
+							log.info("here4");
+							URL url = e.getKey();
+							String cid = e.getValue();
+							String code = emojiToCode.get(url);
+
+							MimeBodyPart mbp = new MimeBodyPart();
+							mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
+							mbp.setFileName(code);
+							mbp.setDisposition("inline");
+							mbp.setContentID("<" + cid + ">");
+							
+							newMimeMultipartRelated.addBodyPart(mbp);
+						}
+						parentPart.addBodyPart(newPartRelated);
+						
+					}else{
+						parentPart.addBodyPart(newPartAlt);
+					}
+				}
+			}else{
+				parentPart.addBodyPart(thisPart);
+			}
+			
+		} else if (p.isMimeType("text/html")) {
+			String html = "";
+			try {
+				html = p.getContent().toString();
+			} catch (IOException IO) {
+				html = "";
+			}
+			MimeBodyPart thisPart = new MimeBodyPart();
+			thisPart.setText(bodyMap.get(html), this.charset, "html");
+			thisPart.setHeader("Content-Transfer-Encoding", "base64");
+			parentPart.addBodyPart(thisPart);
+			
+		} else if (p.isMimeType("multipart/*")) {
+			String subtype = getSubtype(p.getContentType());
+			MimeMultipart newMimeMultipart = new MimeMultipart(subtype);
+
+			Multipart mp;
+			boolean decome = false;
+			boolean alternative = false;
+			
+			try{
+				mp = (Multipart)p.getContent();
+			} catch (IOException ie) {
+				return false;
 			}
 			for (int i = 0; i < mp.getCount(); i++) {
-				parsePart(mp.getBodyPart(i));
+				String childContentType = mp.getBodyPart(i).getContentType();
+				if(getSubtype(childContentType).equalsIgnoreCase("alternative")){
+					alternative = true;
+				}
+				decome = parsePart(mp.getBodyPart(i),newMimeMultipart) || decome;
 			}
+
+			// すでにあるインライン添付ファイルか multipart/alternative と同じ階層に絵文字を挟み込む
+			if (decome || alternative){
+				/*
+				 * XXX
+				 *  spモードメールのpopサーバに格納された時点で送信元が related で送っていても
+				 *  multipart/related が multipart/mixed に変換されている模様。
+				 *  iPhoneの MobileMail.app は multipart/mixed にある添付ファイルはインラインでも
+				 *  添付ファイル扱いをしてしまうので本文と添付ファイルと二重に表示される。
+				 *  iPhoneは逆に related に含まれる添付ファイルは通常の添付ファイルでも表示しないバグがあるため注意文挿入。
+				 */
+				if(conf.isForwardFixMultipartRelated()){
+					log.info(subtype+"->related 強制変更");
+					newMimeMultipart.setSubType("related");
+				}
+				
+				for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
+					URL url = e.getKey();
+					String cid = e.getValue();
+					String code = emojiToCode.get(url);
+
+					MimeBodyPart mbp = new MimeBodyPart();
+					mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
+					mbp.setFileName(code);
+					mbp.setDisposition("inline");
+					mbp.setContentID("<" + cid + ">");
+					
+					newMimeMultipart.addBodyPart(mbp);
+				}
+
+			}
+			
+			MimeBodyPart newPart = new MimeBodyPart();
+			newPart.setContent(newMimeMultipart);
+			if (newMimeMultipart.getCount()>0){
+				parentPart.addBodyPart(newPart);
+			}
+
 		} else {
 			String disposition = p.getDisposition();
 			try{
-				getContainer().addBodyPart((BodyPart)p);
+				parentPart.addBodyPart((BodyPart)p);
+				if(p instanceof MimeBodyPart){
+					if(((MimeBodyPart)p).getContentID()!=null){
+						isInlineImage = true;
+					}
+				}
 			}catch(ClassCastException e){
 				// メールがマルチパートではなく本文が添付ファイルだけの場合は、マルチパートにして添付ファイルをつける
 				try {
@@ -282,7 +474,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					byte contentData[] = Util.inputstream2bytes(p.getInputStream());
 					byte b64data[] = Base64.encodeBase64(contentData);
 					MimeBodyPart newPart = new MimeBodyPart(newPartHeader, b64data);
-					getContainer().addBodyPart((BodyPart)newPart);
+					parentPart.addBodyPart((BodyPart)newPart);
 				} catch (IOException ie) {
 					log.error("未知のエラー",ie);
 				}
@@ -293,6 +485,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// インライン添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
 				log.info("Content-Disposition: INLINE");
+				isInlineImage = true;
 			} else if (disposition != null && disposition.equals(Part.ATTACHMENT)) {
 				// 添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
@@ -302,6 +495,16 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				log.info("Content-Type: "+p.getContentType());
 			}
 		}
+		return isInlineImage;
+	}
+
+	private static String getSubtype(String contenttype){
+		try{
+			String r = contenttype.split("\\r?\\n")[0];
+			return r.split("/")[1].replaceAll("\\s*;.*", "");
+		}catch (Exception e) {
+		}
+		return "";
 	}
 
 	/*
@@ -342,9 +545,11 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 
 		html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		try{
-			this.setHtmlMsg(html);
+			//this.setHtmlMsg(html);
+			this.setHtml(html);
 			if(conf.isMailAlternative()||this.hasPlain){
-				this.setTextMsg(plainText);
+				//this.setTextMsg(plainText);
+				this.setText(plainText);
 			}
 		}catch (Exception e) {
 			throw new EmailException(e);
@@ -377,7 +582,8 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		}
 		
-		Map<URL, String> emojiToCid = new HashMap<URL, String>();
+		//Map<URL, String> emojiToCid = new HashMap<URL, String>();
+		emojiToCid = new HashMap<URL, String>();
 		StringBuilder buf = new StringBuilder();
 		for(char c : html.toCharArray()){
 			if(!EmojiUtil.isEmoji(c)){
@@ -391,8 +597,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				}else{
 					String cid = emojiToCid.get(emojiUrl);
 					if(cid==null){
-						cid = this.embed(emojiUrl, "emoji"+((int)c));
+						//cid = this.embed(emojiUrl, "emoji"+((int)c));
+						cid = randomAlphabetic(MyHtmlEmail.CID_LENGTH).toLowerCase();
 						emojiToCid.put(emojiUrl, cid);
+						emojiToCode.put(emojiUrl, "emoji"+((int)c));
 					}
 					String wh = "";
 					if(px!=null){
@@ -461,6 +669,25 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			html = "<html><head><meta http-equiv=\"content-type\" content=\"text/html; charset="+this.charset+"\"></head>"+html+"</html>";
 		}
 		this.setBodyDontReplace(plain,html);
+	}
+
+	// MimeMultipartの親子関係が保てないのでHtmlEmailのsetTextMsg,setHtmlMsgは使用しない 
+	private void setText(String text){
+		bodyMap.put(this.keyPlainBody, text);
+	}
+	private void setHtml(String html){
+		html = Util.replaceUnicodeMapping(html);
+		html += "\n";
+		try{
+			html = new String(html.getBytes(this.charset));
+		}catch (Exception e) {
+			log.error("setHtmlMsg",e);
+		}
+		if(decomeFlg){
+			bodyMap.put(this.keyHtmlBody, html);
+		}else{
+			bodyMap.put("<html>"+this.keyPlainBody, html);
+		}
 	}
 
 	@Override
