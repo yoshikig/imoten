@@ -159,6 +159,9 @@ public class Config {
 	// forwardAsync = true の場合のみ有効
 	private int forwardRetryMaxCount = 0;
 	
+	// spモードメールの mixed/relatedの補正
+	private boolean forwardFixMultipartRelated = false;
+	
 	// imode/spmodeの選択
 	public enum ForwardOnly {Imode, SPmode, BOTH};
 	private ForwardOnly forwardOnly = ForwardOnly.BOTH;
@@ -374,6 +377,7 @@ public class Config {
 		this.forwardAsync = getBoolean("forward.async", this.forwardAsync);
 		this.forwardRetryIntervalSec = getInt("forward.retryinterval", this.forwardRetryIntervalSec);
 		this.forwardRetryMaxCount = getInt("forward.retrymaxcount", this.forwardRetryMaxCount);
+		this.forwardFixMultipartRelated = getBoolean("forward.spmode.fixinlineattach", this.forwardFixMultipartRelated);
 		String s2 = getString("forward"+n+".only", "");
 		if(s2.equalsIgnoreCase("imode")){
 			this.forwardOnly = ForwardOnly.Imode;
@@ -499,6 +503,7 @@ public class Config {
 		this.forwardAsync = getBoolean("forward"+n+".async", this.forwardAsync);
 		this.forwardRetryIntervalSec = getInt("forward.retryinterval", this.forwardRetryIntervalSec);
 		this.forwardRetryMaxCount = getInt("forward.retrymaxcount", this.forwardRetryMaxCount);
+		this.forwardFixMultipartRelated = getBoolean("forward"+n+".spmode.fixinlineattach", this.forwardFixMultipartRelated);
 		String s2 = getString("forward"+n+".only", "");
 		if(s2.equalsIgnoreCase("imode")){
 			this.forwardOnly = ForwardOnly.Imode;
@@ -889,6 +894,10 @@ public class Config {
 
 	public boolean isForwordPushNotifyBody() {
 		return forwordPushNotifyBody;
+	}
+
+	public boolean isForwardFixMultipartRelated() {
+		return forwardFixMultipartRelated;
 	}
 
 	public String getIgnoreDomainFile() {

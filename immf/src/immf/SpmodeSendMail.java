@@ -36,6 +36,7 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
 import javax.mail.internet.MimeUtility;
 
 import org.apache.commons.codec.binary.Base64;
@@ -141,30 +142,53 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				log.info("Reply-to:"+ia.getAddress());
 			}
 
+			try {
+				byte contentData[] = Util.inputstream2bytes(smm.getInputStream());
+				log.debug("Content-Type:"+smm.getContentType());
+				log.debug("Content[\n"+new String(contentData)+"\n]");
+			} catch (IOException e) {}
+
 			// メールを分解
-			parsePart(smm);
+			parsePart(smm, getContainer());
 			
 			// XXX 本文も添付ファイルもなかったときのために本文を作成。添付ファイル有無の判定要
 			if(this.plainBody.isEmpty()&&this.htmlBody.isEmpty())
 				this.setTextMsg(" ");
 			
 		} catch (MessagingException e) {
-			
+			log.error(e);
 		}
 	}
 
-	private void parsePart(Part p) throws MessagingException {
+	private void parsePart(Part p, MimeMultipart parentPart) throws MessagingException {
+		log.info("parsing: "+p.getContentType());
 		if (this.plainBody.isEmpty() && p.isMimeType("text/plain")) {
 			try {
 				this.plainBody = p.getContent().toString();
 				log.info("plainBody["+plainBody+"]");
+				
+				char[] ca = plainBody.toCharArray();
+				String hexString = "";
+				for (char c : ca){
+					int code = (int)c;
+					hexString += Integer.toHexString(code);
+				}
+				log.debug("文字コードダンプ["+hexString+"]");
+				
 				if(stripAppleQuote){
 					plainBody = Util.stripAppleQuotedLinesText(plainBody);
 					log.info("引用部省略["+plainBody+"]");
 				}
 				plainBody = SpmodeSendMail.charConv.convert(plainBody, "UTF-8");
 				if(!this.plainBody.isEmpty()){
-					this.setTextMsg(plainBody);
+					plainBody = Util.reverseReplaceUnicodeMapping(plainBody);
+					plainBody = SjisString(plainBody);
+					
+					//this.setTextMsg(plainBody);
+					MimeBodyPart thisPart = new MimeBodyPart();
+					thisPart.setText(plainBody, "Shift_JIS", "plain");
+					thisPart.setHeader("Content-Transfer-Encoding", "base64");
+					parentPart.addBodyPart(thisPart);
 				}
 			} catch (Exception e) {
 				log.warn("parse plainBody error",e);
@@ -179,25 +203,40 @@ public class SpmodeSendMail extends MyHtmlEmail {
 					log.info("引用部省略["+htmlBody+"]");
 				}
 				htmlBody = SpmodeSendMail.charConv.convert(htmlBody, "UTF-8");
-				this.setHtmlMsg(htmlBody);
+				htmlBody = Util.reverseReplaceUnicodeMapping(htmlBody);
+				htmlBody = SjisString(htmlBody);
+				
+				//this.setHtmlMsg(htmlBody);
+				MimeBodyPart thisPart = new MimeBodyPart();
+				thisPart.setText(htmlBody, "Shift_JIS", "html");
+				thisPart.setHeader("Content-Transfer-Encoding", "base64");
+				parentPart.addBodyPart(thisPart);
 			} catch (Exception e) {
 				log.warn("parse htmlBody error",e);
 				this.htmlBody = "";
 			}
 		} else if (p.isMimeType("multipart/*")) {
+			String subtype = getSubtype(p.getContentType());
+			MimeMultipart newMimeMultipart = new MimeMultipart(subtype);
+
 			Multipart mp;
-			try {
+			try{
 				mp = (Multipart)p.getContent();
-			} catch (IOException e) {
+			} catch (IOException ie) {
 				return;
 			}
 			for (int i = 0; i < mp.getCount(); i++) {
-				parsePart(mp.getBodyPart(i));
+				parsePart(mp.getBodyPart(i),newMimeMultipart);
 			}
+
+			MimeBodyPart newPart = new MimeBodyPart();
+			newPart.setContent(newMimeMultipart);
+			parentPart.addBodyPart(newPart);
+
 		} else {
 			String disposition = p.getDisposition();
 			try{
-				getContainer().addBodyPart((BodyPart)p);
+				parentPart.addBodyPart((BodyPart)p);
 			}catch(ClassCastException e){
 				// メールがマルチパートではなく本文が添付ファイルだけの場合は、マルチパートにして添付ファイルをつける
 				try {
@@ -210,7 +249,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 					byte contentData[] = Util.inputstream2bytes(p.getInputStream());
 					byte b64data[] = Base64.encodeBase64(contentData);
 					MimeBodyPart newPart = new MimeBodyPart(newPartHeader, b64data);
-					getContainer().addBodyPart((BodyPart)newPart);
+					parentPart.addBodyPart((BodyPart)newPart);
 				} catch (IOException ie) {
 					log.error("未知のエラー",ie);
 				}
@@ -230,6 +269,15 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				log.info("Content-Type: "+p.getContentType());
 			}
 		}
+	}
+
+	private static String getSubtype(String contenttype){
+		try{
+			String r = contenttype.split("\\r?\\n")[0];
+			return r.split("/")[1].replaceAll("\\s*;.*", "");
+		}catch (Exception e) {
+		}
+		return "";
 	}
 
 	@Override
