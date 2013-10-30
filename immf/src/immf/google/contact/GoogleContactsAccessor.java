@@ -104,17 +104,19 @@ public class GoogleContactsAccessor {
 			if (contactEntry != null) {
 				contact = new GoogleContact(contactEntry.getEtag());
 				Name name = contactEntry.getName();
-				if (name.hasFullName()) {
-					contact.setName(name.getFullName().getValue());
-				} else {
-					StringBuilder nameBuilder = new StringBuilder();
-					if (name.hasFamilyName()) {
-						nameBuilder.append(name.getFamilyName().getValue());
+				if(name!=null){
+					if (name.hasFullName()) {
+						contact.setName(name.getFullName().getValue());
+					} else {
+						StringBuilder nameBuilder = new StringBuilder();
+						if (name.hasFamilyName()) {
+							nameBuilder.append(name.getFamilyName().getValue());
+						}
+						if (name.hasGivenName()) {
+							nameBuilder.append(name.getGivenName().getValue());
+						}
+						contact.setName(nameBuilder.toString());
 					}
-					if (name.hasGivenName()) {
-						nameBuilder.append(name.getGivenName().getValue());
-					}
-					contact.setName(nameBuilder.toString());
 				}
 				contact.setMailAddress(targetEmailAddress);
 				contact.setUpdateTime(contactEntry.getUpdated());
