@@ -86,12 +86,17 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private MimeMultipart rootMultipart = null;
 	private List<BodyPart> attachedParts = new ArrayList<BodyPart>();
 
-	public SpmodeForwardMail(Message sm, Config conf) throws EmailException{
+	private AddressBook addressBook;
+	private String mailAddrCharset = "ISO-2022-jP";
+
+	public SpmodeForwardMail(Message sm, Config conf, AddressBook addressBook) throws EmailException{
 		this.smm = sm;
 		this.conf = conf;
+		this.addressBook = addressBook;
 
 		this.setDebug(conf.isMailDebugEnable());
 		this.setCharset(this.conf.getMailEncode());
+		this.mailAddrCharset = this.charset;
 		this.setContentTransferEncoding(this.conf.getContentTransferEncoding());
 
 		if(SpmodeForwardMail.subjectCharConvMap!=null
@@ -168,15 +173,14 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// Dateヘッダ不正文字列混入（大抵spam）
 				smmDate = null;
 			}
-			// XXX ImodeNetClient.java getMail() アドレス帳との連携は未
 			// From:
-			smmFromAddr = (InternetAddress) smm.getFrom()[0];
+			smmFromAddr = this.addressBook.getInternetAddress((InternetAddress) smm.getFrom()[0],this.mailAddrCharset);
 			headerInfo.append(" From:    ").append(smmFromAddr.toUnicodeString()).append("\r\n");
 			// ReplyTo:
 			Address[] addrsReplyTo = smm.getReplyTo();
 			if (addrsReplyTo != null){
 				for (int i = 0; i < addrsReplyTo.length; i++) {
-					smmReplyToAddrList.add((InternetAddress) addrsReplyTo[i]);
+					smmReplyToAddrList.add(this.addressBook.getInternetAddress((InternetAddress) addrsReplyTo[i],this.mailAddrCharset));
 				}
 			}
 			// To:
@@ -185,7 +189,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			boolean bccLabel = true;
 			if (addrsTo != null){
 				for (int i = 0; i < addrsTo.length; i++) {
-					InternetAddress addr = (InternetAddress) addrsTo[i];
+					InternetAddress addr = this.addressBook.getInternetAddress((InternetAddress) addrsTo[i],this.mailAddrCharset);
 					smmToAddrList.add(addr);
 					headerInfo.append(label + "      ").append(addr.toUnicodeString()).append("\r\n");
 					label="    ";
@@ -199,7 +203,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			label = " Cc:";
 			if (addrsCc != null){
 				for (int i = 0; i < addrsCc.length; i++) {
-					InternetAddress addr = (InternetAddress) addrsCc[i];
+					InternetAddress addr = this.addressBook.getInternetAddress((InternetAddress) addrsCc[i],this.mailAddrCharset);
 					smmCcAddrList.add(addr);
 					headerInfo.append(label + "      ").append(addr.toUnicodeString()).append("\r\n");
 					label="    ";

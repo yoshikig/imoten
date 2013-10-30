@@ -88,6 +88,21 @@ public class AddressBook {
 		}
 	}
 
+	public InternetAddress getInternetAddress(InternetAddress iAddress, String charset){
+		String mailAddress = iAddress.getAddress();
+		ImodeAddress ia = this.getImodeAddress(mailAddress);
+		try{
+			if(ia==null){
+				return new MyInternetAddress(mailAddress,iAddress.getPersonal(), charset);
+			}else{
+				return new MyInternetAddress(mailAddress,ia.getName(), charset);
+			}
+		}catch (Exception e) {
+			log.warn("mail addrress format error.["+mailAddress+"]",e);
+			return iAddress;
+		}
+	}
+
 	public void addPcAddr(ImodeAddress ia){
 		this.pcAddrMap.put(ia.getMailAddress(), ia);
 	}

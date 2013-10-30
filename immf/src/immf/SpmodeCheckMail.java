@@ -30,6 +30,11 @@ import javax.mail.Session;
 import javax.mail.Store;
 import javax.mail.internet.InternetAddress;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 //import java.util.Date;
@@ -56,6 +61,10 @@ public class SpmodeCheckMail implements Runnable{
 	private Map<Config, ForwardMailPicker> forwarders = new HashMap<Config, ForwardMailPicker>();
 	private Map<Config, List<String>> ignoreDomainsMap = new HashMap<Config, List<String>>();
 
+	private AddressBook addressBook;
+	private String csvAddressBook;
+	private String vcAddressBook;
+
 	public SpmodeCheckMail(ServerMain server){
 		this.conf = server.conf;
 		this.status = server.status;
@@ -67,6 +76,8 @@ public class SpmodeCheckMail implements Runnable{
 		this.numForwardSite = conf.countForwardSite();
 		this.forwarders = server.forwarders;
 		this.ignoreDomainsMap = server.ignoreDomainsMap;
+		this.csvAddressBook = this.conf.getCsvAddressFile();
+		this.vcAddressBook = this.conf.getVcAddressFile();
 	}
 
 	public void run() {
@@ -83,6 +94,9 @@ public class SpmodeCheckMail implements Runnable{
 
 		final String myname = conf.getSpmodeMailUser();
 		final String passwd = conf.getSpmodeMailPasswd();
+
+		// 読み込みは初回起動時のみ
+		this.loadAddressBook();
 
 		//Date lastUpdate = null;
 		while(true){
@@ -239,7 +253,7 @@ public class SpmodeCheckMail implements Runnable{
 				if(notForward){
 					continue;
 				}
-				SpmodeForwardMail forwardMail = new SpmodeForwardMail(msg, forwardConf);
+				SpmodeForwardMail forwardMail = new SpmodeForwardMail(msg, forwardConf, this.addressBook);
 				forwardMail.send();
 				if(numForwardSite>1){
 					log.info("転送処理完了["+id+"]");
@@ -305,6 +319,190 @@ public class SpmodeCheckMail implements Runnable{
 		}catch (Exception e) {}
 	}
 	
+	// ImodeNetClient.javaより
+	/*
+	 * アドレス帳情報を読み込む
+	 */
+	private void loadAddressBook(){
+		AddressBook ab = new AddressBook();
+		try{
+			this.loadCsvAddressBook(ab);
+		}catch (Exception e) {
+			log.warn("CSVのアドレス帳情報が読み込めませんでした。");
+		}
+		try{
+			this.loadVcAddressBook(ab);
+		}catch (Exception e) {
+			log.warn("vCardのアドレス帳情報が読み込めませんでした。");
+		}
+
+		this.addressBook = ab;
+	}
+	/*
+	 * CSVのアドレス帳情報を読み込む
+	 */
+	private void loadCsvAddressBook(AddressBook ab) throws IOException{
+		if(this.csvAddressBook==null){
+			return;
+		}
+		File csvFile = new File(this.csvAddressBook);
+		if(!csvFile.exists()){
+			log.info("# CSVアドレス帳ファイル("+this.csvAddressBook+")は存在しません。");
+			return;
+		}
+		log.info("# CSVアドレス帳情報を読み込みます。");
+		BufferedReader br = null;
+		FileReader fr = null;
+		try{
+			// デフォルトエンコードで読み込まれる
+			// wrapper.confで-Dfile.encoding=UTF-8を指定しているのでUTF-8になる
+			fr = new FileReader(csvFile);
+			br = new BufferedReader(fr);
+			int id = 0;
+
+			String line = null;
+			while((line = br.readLine()) != null){
+				// フォーマット:
+				// メールアドレス,ディスプレイネーム
+				id++;
+				try{
+					String[] field = line.split(",");
+					if(field.length < 2){
+						continue;
+					}
+					InternetAddress[] addrs = InternetAddress.parse(field[0]);
+					if(addrs.length == 0)
+						continue;
+					ImodeAddress ia = new ImodeAddress();
+					ia.setMailAddress(addrs[0].getAddress());
+					ia.setName(field[1]);
+					ia.setId(String.valueOf(id));
+					ab.addCsvAddr(ia);
+					log.debug("ID:"+ia.getId()+" / Name:"+ia.getName()+" / Address:"+ia.getMailAddress());
+
+				}catch (Exception e) {
+					log.warn("CSVファイル("+id+"行目)に問題があります["+line+"]");
+				}
+			}
+			br.close();
+		}catch (Exception e){
+			log.warn("loadCsvAddressBook "+this.csvAddressBook+" error.",e);
+
+		}finally{
+			Util.safeclose(br);
+			Util.safeclose(fr);
+		}
+	}
+
+	/*
+	 * vCardのアドレス帳情報を読み込む
+	 */
+	private void loadVcAddressBook(AddressBook ab) throws IOException{
+		if(this.vcAddressBook==null){
+			return;
+		}
+		File vcFile = new File(this.vcAddressBook);
+		if(!vcFile.exists()){
+			log.info("# vCardアドレス帳ファイル("+this.vcAddressBook+")は存在しません。");
+			return;
+		}
+		log.info("# vCardアドレス帳情報を読み込みます。");
+		FileInputStream fis = null;
+		byte[] vcData = null;
+		try{
+			fis = new FileInputStream(vcFile);
+			vcData = new byte[(int)vcFile.length()];
+			fis.read(vcData);
+		}catch (Exception e){
+			log.warn("loadVcAddressBook "+this.vcAddressBook+" error.",e);
+		}finally{
+			Util.safeclose(fis);
+		}
+
+		int id = 0;
+		boolean vcBegin = false;
+		String vcName = null;
+		String vcEmail = null;
+
+		int lineStart = 0;
+		int lineLength = 0;
+
+		for(int i=lineStart; i<=vcFile.length(); i++){
+			try{
+				if(i == vcFile.length() || vcData[i] == '\n'){
+					String line = new String(vcData, lineStart, lineLength);
+					int curLineStart = lineStart;
+					int curLineLength = lineLength;
+
+					lineStart = i+1;
+					lineLength = 0;
+
+					String field[] = line.split(":");
+					if(field[0].equalsIgnoreCase("BEGIN")){
+						vcBegin = true;
+						vcName = null;
+						vcEmail = null;
+						id++;
+					}
+					if(vcBegin == true && field[0].equalsIgnoreCase("END")){
+						vcBegin = false;
+
+						if (vcName == null || vcEmail == null)
+							continue;
+
+						String vcEmails[] = vcEmail.split(";");
+						for(int j=0; j<vcEmails.length; j++){
+							InternetAddress[] addrs = InternetAddress.parse(vcEmails[j]);
+							if(addrs.length == 0)
+								continue;
+							ImodeAddress ia = new ImodeAddress();
+							ia.setMailAddress(addrs[0].getAddress());
+							ia.setName(vcName);
+							ia.setId(String.valueOf(id+"-"+(j+1)));
+							ab.addVcAddr(ia);
+							log.debug("ID:"+ia.getId()+" / Name:"+ia.getName()+" / Address:"+ia.getMailAddress());
+						}
+					}
+
+					if(vcBegin != true || field.length < 2)
+						continue;
+
+					String label[] = field[0].split(";");
+					String value[] = field[1].split(";");
+					// 姓名
+					if(label[0].equalsIgnoreCase("FN")){
+						vcName = field[1].replace(";"," ").trim();
+						if(label.length < 2)
+							continue;
+						String option[] = label[1].split("=");
+						if(option.length < 1 || !option[0].equalsIgnoreCase("CHARSET"))
+							continue;
+						int valueStart = curLineStart;
+						for(int pos=curLineStart; pos<curLineStart+curLineLength; pos++){
+							if(vcData[pos] == ':'){
+								valueStart = pos+1;
+								break;
+							}
+						}
+						vcName = new String(vcData, valueStart, curLineLength-(valueStart-curLineStart), option[1]).replace(";"," ").trim();
+
+					}
+					// EMAIL
+					if(label[0].equalsIgnoreCase("EMAIL")){
+						if(vcEmail == null)
+							vcEmail = value[0];
+						else
+							vcEmail = vcEmail + ';' + value[0];
+					}
+
+				}else if(vcData[i] != '\r'){
+					lineLength++;
+				}
+			}catch (Exception e) {
+				log.warn("vCardファイル("+id+"件目)に問題があります");
+			}
+		}
+	}
 	/*
 	 * XXX
 	 * 既存のAPIを使用するためImodeMailへ変換
