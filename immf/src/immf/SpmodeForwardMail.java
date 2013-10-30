@@ -323,21 +323,18 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			} catch (IOException io) {
 				text = "";
 			}
-			MimeBodyPart thisPart = new MimeBodyPart();
-			thisPart.setText(bodyMap.get(text), this.charset, "plain");
-			thisPart.setHeader("Content-Transfer-Encoding", "base64");
-			log.info("PLAIN Part["+bodyMap.get(text)+"]");
-			
-			// 絵文字があった場合にマルチパートを作成して絵文字を挟み込む
-			boolean emoji = false;
-			if(emojiToCid.size()>0){
-				emoji = true;
+			String emojitext = bodyMap.get(text);
+			if (emojitext==null){
+				// 本文ではない添付ファイルの text/plain
+				parentPart.addBodyPart((BodyPart)p);
+				return false;
 			}
+				
+			MimeBodyPart thisPart = new MimeBodyPart();
+			thisPart.setText(emojitext, this.charset, "plain");
+			thisPart.setHeader("Content-Transfer-Encoding", "base64");
+			log.info("PLAIN Part["+emojitext+"]");
 			
-			MimeMultipart newMimeMultipartRelated = new MimeMultipart("related");
-			MimeBodyPart newPartRelated = new MimeBodyPart();
-			newPartRelated.setContent(newMimeMultipartRelated);
-
 			if(!decomeFlg){
 				// 元メールがテキスト形式だった場合
 				String html = bodyMap.get("<html>"+text);
@@ -353,7 +350,12 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					newMimeMultipartAlt.addBodyPart(thisPart);
 					newMimeMultipartAlt.addBodyPart(htmlPart);
 					newPartAlt.setContent(newMimeMultipartAlt);
-					if(emoji){
+
+					// 絵文字があった場合にマルチパートを作成して絵文字を挟み込む
+					if(emojiToCid.size()>0){
+						MimeMultipart newMimeMultipartRelated = new MimeMultipart("related");
+						MimeBodyPart newPartRelated = new MimeBodyPart();
+						newPartRelated.setContent(newMimeMultipartRelated);
 						newMimeMultipartRelated.addBodyPart(newPartAlt);
 						
 						for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
@@ -381,16 +383,23 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}
 			
 		} else if (p.isMimeType("text/html")) {
-			String html = "";
+			String text = "";
 			try {
-				html = p.getContent().toString();
+				text = p.getContent().toString();
 			} catch (IOException IO) {
-				html = "";
+				text = "";
 			}
+			String emojihtml = bodyMap.get(text);
+			if (emojihtml==null){
+				// 本文ではない添付ファイルの text/html
+				parentPart.addBodyPart((BodyPart)p);
+				return false;
+			}
+
 			MimeBodyPart thisPart = new MimeBodyPart();
-			thisPart.setText(bodyMap.get(html), this.charset, "html");
+			thisPart.setText(emojihtml, this.charset, "html");
 			thisPart.setHeader("Content-Transfer-Encoding", "base64");
-			log.info("HTML Part["+bodyMap.get(html)+"]");
+			log.info("HTML Part["+emojihtml+"]");
 			parentPart.addBodyPart(thisPart);
 			
 		} else if (p.isMimeType("multipart/*")) {
@@ -420,14 +429,17 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// multipart/alternative があったかどうか
 				String childContentType = childBodyPart.getContentType();
 				String childSubType = getSubtype(childContentType);
+				String childDisposition = childBodyPart.getDisposition();
 				if(childSubType.equalsIgnoreCase("alternative")){
 					alternative = true;
 				}
 
 				// インラインではない添付ファイルを related の外に出すための処理
 				if(!inlineParsed && conf.isForwardFixMultipartRelated()){
-					log.info("move part: "+childBodyPart.getFileName());
-					if(!childContentType.startsWith("multipart/") && !childContentType.startsWith("text/")) {
+					if(!childContentType.startsWith("multipart/")
+							&& ((childDisposition != null && childDisposition.equals(Part.ATTACHMENT))
+									|| !childContentType.startsWith("text/"))) {
+						log.info("move part: "+childBodyPart.getFileName());
 						newMimeMultipart.removeBodyPart(childBodyPart);
 						attachedParts.add(childBodyPart);
 					}
