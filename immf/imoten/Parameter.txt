@@ -569,6 +569,15 @@ forward.only
 　- [無指定]：iモード、spモードどちらも転送
 　- [imode]：iモードメール受信時のみ転送
 　- [spmode]：spモードメール受信時のみ転送
+　- [push]：メール転送は行いませんがPush通知用のメール件名やメール本文に対する絵文字の変換ルールを指定できます。
+　　　　　　[push]はspモードメール受信時のみ動作しiモードメールは無視します。
+
+forward.spmode.fixinlineattach
+　spモードメールサーバ側で保管されているメールは、docomo側の処理で multipart/related が multipart/mixed
+　に修正されている場合があります。メーラーによっては添付画像が二重に表示されるなどの問題があるため、
+　imoten ではそれを multipart/related に戻した上で通常の添付ファイルは multipart/related ではない
+　パートに格納して配信する処理を行います。このような処理をさせたくない場合は false を設定してください。
+　デフォルト[true]
 
 sender.smtp.spmode.user
 sender.smtp.spmode.passwd
