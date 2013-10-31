@@ -163,7 +163,7 @@ public class Config {
 	private boolean forwardFixMultipartRelated = false;
 	
 	// imode/spmodeの選択
-	public enum ForwardOnly {Imode, SPmode, BOTH};
+	public enum ForwardOnly {Imode, SPmode, BOTH, PUSH};
 	private ForwardOnly forwardOnly = ForwardOnly.BOTH;
 
 	// trueの場合はcookieの情報をファイルに保存する。
@@ -383,6 +383,8 @@ public class Config {
 			this.forwardOnly = ForwardOnly.Imode;
 		}else if(s2.equalsIgnoreCase("spmode")){
 			this.forwardOnly = ForwardOnly.SPmode;
+		}else if(s2.equalsIgnoreCase("push")){
+			this.forwardOnly = ForwardOnly.PUSH;
 		}
 		this.ignoreDomainFile = getString("forward.ignoredomainfile", this.ignoreDomainFile);
 		*/
@@ -509,6 +511,8 @@ public class Config {
 			this.forwardOnly = ForwardOnly.Imode;
 		}else if(s2.equalsIgnoreCase("spmode")){
 			this.forwardOnly = ForwardOnly.SPmode;
+		}else if(s2.equalsIgnoreCase("push")){
+			this.forwardOnly = ForwardOnly.PUSH;
 		}
 		this.ignoreDomainFile = getString("forward"+n+".ignoredomainfile", this.ignoreDomainFile);
 
@@ -551,7 +555,9 @@ public class Config {
 				+ splitComma(getString("forward." + i + ".cc", "")).size()
 				+ splitComma(getString("forward." + i + ".bcc", "")).size();
 			if(to == 0){
-				break;
+				if(!getString("forward." + i + ".only", "").equalsIgnoreCase("push")){
+					break;
+				}
 			}
 		}
 		return i - 1;

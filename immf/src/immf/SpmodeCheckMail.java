@@ -230,14 +230,14 @@ public class SpmodeCheckMail implements Runnable{
 			from = "";
 		}
 		List<String> ignoreDomains = new ArrayList<String>();
+		ImodeMail mail = null;
 		try{
 			// 送信
 			for (Map.Entry<Config, ForwardMailPicker> f : forwarders.entrySet()) {
 				Config forwardConf = f.getKey();
 				int id = forwardConf.getConfigId();
 
-				if(forwardConf.getForwardOnly()!=Config.ForwardOnly.SPmode
-						&&forwardConf.getForwardOnly()!=Config.ForwardOnly.BOTH){
+				if(forwardConf.getForwardOnly()==Config.ForwardOnly.Imode){
 					continue;
 				}
 
@@ -254,7 +254,16 @@ public class SpmodeCheckMail implements Runnable{
 					continue;
 				}
 				SpmodeForwardMail forwardMail = new SpmodeForwardMail(msg, forwardConf, this.addressBook);
-				forwardMail.send();
+				if(mail==null){
+					// Push通知用：1番目の転送先から取得
+					mail = forwardMail.getImodeMail();
+				}
+				if(forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH){
+					// Push通知用：上書き
+					mail = forwardMail.getImodeMail();
+				}else{
+					forwardMail.send();
+				}
 				if(numForwardSite>1){
 					log.info("転送処理完了["+id+"]");
 				}else{
@@ -276,7 +285,6 @@ public class SpmodeCheckMail implements Runnable{
 			}
 		}
 
-		ImodeMail mail = message2imodemail(msg);
 		try{
 			this.skypeForwarder.forward(mail);
 		}catch (Exception e) {
@@ -338,6 +346,7 @@ public class SpmodeCheckMail implements Runnable{
 
 		this.addressBook = ab;
 	}
+
 	/*
 	 * CSVのアドレス帳情報を読み込む
 	 */
@@ -502,23 +511,5 @@ public class SpmodeCheckMail implements Runnable{
 				log.warn("vCardファイル("+id+"件目)に問題があります");
 			}
 		}
-	}
-	/*
-	 * XXX
-	 * 既存のAPIを使用するためImodeMailへ変換
-	 */
-	ImodeMail message2imodemail(Message msg){
-		ImodeMail imodemail = new ImodeMail();
-		try{
-			imodemail.setFromAddr((InternetAddress)msg.getFrom()[0]);
-			imodemail.setSubject(msg.getSubject());
-			imodemail.setDecomeFlg(false);
-			SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
-			imodemail.setTime(df.format(msg.getSentDate()));
-			imodemail.setBody("(表示省略)");
-		}catch(MessagingException e){
-			log.warn("例外処理省略",e);
-		}
-		return imodemail; 
 	}
 }

@@ -885,4 +885,24 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	public static void setStrConv(Map<Config, StringConverter> strConvMap) {
 		SpmodeForwardMail.strConvMap = strConvMap;
 	}
+	
+	/*
+	 * Push通知に既存のAPIを使用するためImodeMail形式の取得
+	 */
+	public ImodeMail getImodeMail() {
+		ImodeMail imodemail = new ImodeMail();
+		imodemail.setFromAddr(this.smmFromAddr);
+		imodemail.setDecomeFlg(false);
+		SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
+		imodemail.setTime(df.format(this.smmDate));
+		String subject = this.subjectCharConv.convert(this.smmSubject);
+		imodemail.setSubject(subject);
+		String body = bodyMap.get(this.keyPlainBody);
+		if (body!=null){
+			imodemail.setBody(body);
+		}else{
+			imodemail.setBody("(本文取得失敗)");
+		}
+		return imodemail;
+	}
 }
