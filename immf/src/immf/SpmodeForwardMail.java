@@ -243,6 +243,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			log.error(e);
 		}
 
+		// 未使用。本文末尾にメッセージを追加する際に使用。parseTextPart()内でoptionPlainMsgの設定を想定
 		this.plainBody += this.optionPlainMsg;
 		this.htmlBody += this.optionHtmlMsg;
 		
@@ -460,7 +461,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				 *  添付ファイル扱いをしてしまうので本文と添付ファイルと二重に表示される。
 				 *  iPhoneは逆に related に含まれる添付ファイルは通常の添付ファイルでも表示しないバグがあるため注意文挿入。
 				 */
-				if(conf.isForwardFixMultipartRelated()){
+				if(conf.isForwardFixMultipartRelated() && (decome || emojiToCid.size()>0)){
 					log.info(subtype+"->related 強制変更");
 					newMimeMultipart.setSubType("related");
 				}
@@ -549,7 +550,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		String html = this.htmlBody;
 		String plain = this.plainBody;
 		if(this.decomeFlg){
-			// HTMLメール
+			// HTMLメール（このplainや以下のisEmptyのplainは使われないはず）
 			if (plain.isEmpty())
 				plain = Util.html2text(html);
 		}else{

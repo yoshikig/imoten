@@ -160,7 +160,7 @@ public class Config {
 	private int forwardRetryMaxCount = 0;
 	
 	// spモードメールの mixed/relatedの補正
-	private boolean forwardFixMultipartRelated = false;
+	private boolean forwardFixMultipartRelated = true;
 	
 	// imode/spmodeの選択
 	public enum ForwardOnly {Imode, SPmode, BOTH, PUSH};
