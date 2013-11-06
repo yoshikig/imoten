@@ -63,6 +63,7 @@ public class ServerMain {
 	private Map<Config, StringConverter> strConvMap = new HashMap<Config, StringConverter>();
 	private SendMailPicker spicker;
 	private int numForwardSite;
+	private boolean doForwading = false;
 
 	public ServerMain(File conffile){
 		System.out.println("StartUp ["+Version+"]");
@@ -76,6 +77,12 @@ public class ServerMain {
 			this.numForwardSite = conf.countForwardSite();
 			if(numForwardSite>1){
 				log.info("複数の転送設定があります:"+numForwardSite);
+			}
+			if(!(this.conf.getForwardTo().isEmpty()
+					&& this.conf.getForwardCc().isEmpty()
+					&& this.conf.getForwardBcc().isEmpty())
+					|| this.conf.getForwardOnly()==Config.ForwardOnly.PUSH) {
+				this.doForwading = true;
 			}
 
 		}catch (Exception e) {
@@ -146,6 +153,13 @@ public class ServerMain {
 				// 転送抑止ドメインリスト読み込み
 				this.loadIgnoreDomainList(forwardConf, i);
 
+				if(!(forwardConf.getForwardTo().isEmpty()
+						&& forwardConf.getForwardCc().isEmpty()
+						&& forwardConf.getForwardBcc().isEmpty())
+						|| forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH) {
+					this.doForwading = true;
+				}
+
 			}catch (Exception e) {
 				log.fatal("Config Error. 設定ファイルに問題があります。",e);
 				e.printStackTrace();
@@ -176,10 +190,8 @@ public class ServerMain {
 		// for Notify My Android
 		this.nmaNotifier = GrowlNotifier.getInstance(NMAClient.getInstance(), this.conf);
 
-		if(!(this.conf.getForwardTo().isEmpty()
-				&& this.conf.getForwardCc().isEmpty()
-				&& this.conf.getForwardBcc().isEmpty())) {
-			// iモードメール着信監視
+		if(this.doForwading) {
+			// iモードメール着監視
 			if(this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
 				ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
 				Thread ti = new Thread(imodeChecker);
