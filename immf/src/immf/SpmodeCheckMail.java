@@ -49,6 +49,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class SpmodeCheckMail implements Runnable{
 	private static final Log log = LogFactory.getLog(ServerMain.class);
+	private static final String InitialId = "0";
 
 	private Config conf;
 	private StatusManager status;
@@ -64,6 +65,8 @@ public class SpmodeCheckMail implements Runnable{
 	private AddressBook addressBook;
 	private String csvAddressBook;
 	private String vcAddressBook;
+	private int unknownForwardLimit;
+	private boolean forwardWithoutPush = false;
 
 	public SpmodeCheckMail(ServerMain server){
 		this.conf = server.conf;
@@ -78,6 +81,13 @@ public class SpmodeCheckMail implements Runnable{
 		this.ignoreDomainsMap = server.ignoreDomainsMap;
 		this.csvAddressBook = this.conf.getCsvAddressFile();
 		this.vcAddressBook = this.conf.getVcAddressFile();
+		this.unknownForwardLimit = this.conf.getSpmodeUnknownForwardLimit();
+		for (Map.Entry<Config, ForwardMailPicker> f : forwarders.entrySet()) {
+			Config forwardConf = f.getKey();
+			if(forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH){
+				this.forwardWithoutPush = true;
+			}
+		}
 	}
 
 	public void run() {
@@ -165,12 +175,37 @@ public class SpmodeCheckMail implements Runnable{
 							log.error("メールヘッダ取得失敗",me);
 						}
 					}
-								
+					
+					//該当するIDのメールが削除されていた場合、全再送を防ぐため上限数を設定する。上限数マイナスの場合は上限設定無効
+					int recievemax = this.unknownForwardLimit;
+					if (start < 0 && recievemax >= 0 && !lastId.equals(InitialId)){
+						log.warn("最後に取得したメールが発見できなかったため最新の" + recievemax + "通(spmode.unknownforwardlimit)を上限としてメール転送します");
+						start = messages.length - Math.min(messages.length,recievemax) - 1;
+						
+						//IDを最新メールに再設定する
+						if(messages.length>0){
+							try{
+								thisId = messages[messages.length-1].getHeader("Message-ID")[0];
+							}catch(MessagingException me){
+								log.error("メールヘッダ取得失敗",me);
+							}
+						}else{
+							//メールボックスが空なので次回からすべてのメールを再転送する
+							thisId = InitialId;
+						}
+					}
+					
 					//メールの取得と転送
 					log.info("転送するメールIDの数 "+(messages.length - start - 1));
 					appNotifications.pushPrepare(0, messages.length - start - 1);
 					for (int index = start + 1; index < messages.length; index++) {
 						msg = messages[index];
+						try {
+							byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
+							log.debug("Content-Type:"+msg.getContentType());
+							log.debug("Content[\n"+new String(contentData)+"\n]");
+						} catch (IOException e) {}
+
 						try{
 							thisId = msg.getHeader("Message-ID")[0];
 							log.info("メール転送:"+index+","+thisId);
@@ -254,14 +289,15 @@ public class SpmodeCheckMail implements Runnable{
 					continue;
 				}
 				SpmodeForwardMail forwardMail = new SpmodeForwardMail(msg, forwardConf, this.addressBook);
-				if(mail==null){
-					// Push通知用：1番目の転送先から取得
-					mail = forwardMail.getImodeMail();
-				}
-				if(forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH){
-					// Push通知用：上書き
-					mail = forwardMail.getImodeMail();
+				if(this.forwardWithoutPush){
+					// imoten.iniにforward.only=pushが一つでもある場合
+					if(forwardConf.getForwardOnly()!=Config.ForwardOnly.PUSH){
+						forwardMail.send();
+					}else{
+						mail = forwardMail.getImodeMail();
+					}
 				}else{
+					mail = (mail!=null) ? mail : forwardMail.getImodeMail();
 					forwardMail.send();
 				}
 				if(numForwardSite>1){
@@ -276,13 +312,13 @@ public class SpmodeCheckMail implements Runnable{
 			return;
 		}
 
-		//  転送抑止ドメインリストと比較してPush送信可否判定
-		ignoreDomains = ignoreDomainsMap.get(this.conf);
-		for (String domain : ignoreDomains) {
-			if(from.endsWith(domain)){
-				this.appNotifications.pushError(0);
-				return;
-			}
+		if(mail==null){
+			this.appNotifications.pushError(0);
+			try{
+				// 負荷をかけないように
+				Thread.sleep(1000);
+			}catch (Exception e) {}
+			return;
 		}
 
 		try{

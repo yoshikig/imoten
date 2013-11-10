@@ -51,6 +51,7 @@ public class Config {
 	private String spmodeMailPasswd;
 	// spモードのメールボックスの読み書き属性
 	private boolean spmodeReadonly = true;
+	private int spmodeUnknownForwardLimit = 10;
 
 	// SMTPサーバ
 	private String smtpServer;
@@ -306,6 +307,7 @@ public class Config {
 		this.spmodeMailAddr =	getString("spmode.mail", null);
 		this.spmodeMailPasswd = getString("spmode.passwd", null);
 		this.spmodeReadonly =	getBoolean("spmode.mbox.readonly", this.spmodeReadonly);
+		this.spmodeUnknownForwardLimit =	getInt("spmode.unknownforwardlimit", this.spmodeUnknownForwardLimit);
 		this.smtpServer = 		getString("smtp.server", null);
 		this.smtpPort = 		getInt(   "smtp.port", this.smtpPort);
 		this.smtpConnectTimeoutSec = getInt("smtp.connecttimeout", this.smtpConnectTimeoutSec);
@@ -593,6 +595,10 @@ public class Config {
 
 	public boolean isSpmodeReadonly() {
 		return spmodeReadonly;
+	}
+
+	public int getSpmodeUnknownForwardLimit() {
+		return spmodeUnknownForwardLimit;
 	}
 
 	public String getGmailId() {
