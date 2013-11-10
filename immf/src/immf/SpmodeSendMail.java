@@ -90,7 +90,6 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		}
 
 		try{
-			// XXX ImodeNetClient.java getMail() アドレス帳との連携は未
 			// From:
 			InternetAddress smmFromAddr = (InternetAddress) smm.getFrom()[0];
 			if (!smmFromAddr.getAddress().equalsIgnoreCase(mymailaddr)){

@@ -191,7 +191,7 @@ public class ServerMain {
 		this.nmaNotifier = GrowlNotifier.getInstance(NMAClient.getInstance(), this.conf);
 
 		if(this.doForwading) {
-			// iモードメール着監視
+			// iモードメール着信監視
 			if(this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
 				ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
 				Thread ti = new Thread(imodeChecker);
