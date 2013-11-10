@@ -203,6 +203,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				}
 				htmlBody = SpmodeSendMail.charConv.convert(htmlBody, "UTF-8");
 				htmlBody = Util.reverseReplaceUnicodeMapping(htmlBody);
+				htmlBody = HtmlConvert.replaceAllCaseInsenstive(htmlBody,"<meta[^>]*charset[^>]*>",""); //charsetを含むmetaタグの削除
 				htmlBody = SjisString(htmlBody);
 				
 				//this.setHtmlMsg(htmlBody);
