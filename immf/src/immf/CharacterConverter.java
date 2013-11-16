@@ -19,10 +19,12 @@ import org.apache.commons.logging.LogFactory;
 public class CharacterConverter {
 	private static final Log log = LogFactory.getLog(CharacterConverter.class);
 	private Map<Integer,String> replaceMap;
+	private Map<Integer,Map<Integer,String>> compositionReplaceMap;
 	private boolean convertSoftbankSjis = false;
 	
 	public CharacterConverter(){
 		this.replaceMap = new HashMap<Integer, String>();			
+		this.compositionReplaceMap = new HashMap<Integer, Map<Integer,String>>();
 	}
 	
 	public void load(File f) throws IOException{
@@ -47,7 +49,6 @@ public class CharacterConverter {
 					continue;
 				}
 				try{
-					int from = Integer.parseInt(vals[0], 16);
 					String to = null;
 					if(vals[1].matches("^[0-9a-fA-F]+$")){
 						// 16進数の場合はUnicode
@@ -62,8 +63,24 @@ public class CharacterConverter {
 					}else{
 						to = vals[1];
 					}
-					log.debug("CharConv From ["+String.valueOf(Character.toChars(from))+"("+vals[0]+")], to ["+to+"("+vals[1]+")]");
-					this.replaceMap.put(from, to);
+
+					if(vals[0].matches("^[0-9a-fA-F]+$")){
+						int from = Integer.parseInt(vals[0], 16);
+						log.debug("CharConv From ["+String.valueOf(Character.toChars(from))+"("+vals[0]+")], to ["+to+"("+vals[1]+")]");
+						this.replaceMap.put(from, to);
+					}else if(vals[0].matches("^[0-9a-fA-F]+[+][0-9a-fA-F]+$")){
+						String pair[] = vals[0].split("[+]");
+						int from1 = Integer.parseInt(pair[0], 16);
+						int from2 = Integer.parseInt(pair[1], 16);
+						Map<Integer,String> subCompositionReplaceMap = this.compositionReplaceMap.get(from2);
+						if(subCompositionReplaceMap==null){
+							subCompositionReplaceMap = new HashMap<Integer, String>();
+							this.compositionReplaceMap.put(from2, subCompositionReplaceMap);
+						}
+						log.debug("CharConv From ["+from1+"+"+from2+"], to ["+to+"("+vals[1]+")]");
+						subCompositionReplaceMap.put(from1, to);
+					}
+
 				}catch (Exception e) {
 					log.warn("文字変換表 "+f.getName()+"("+lineCount+"行目)に問題があります。");
 				}
@@ -83,6 +100,20 @@ public class CharacterConverter {
 		for (int i = 0; i < str.length(); ) {
 			int cp = str.codePointAt(i);
 			String s = this.replaceMap.get(cp);
+			i += Character.charCount(cp);
+			
+			// 2文字までの結合文字への対応
+			if(i<str.length()){
+				int ncp = str.codePointAt(i);
+				Map<Integer,String> subCompositionReplaceMap = this.compositionReplaceMap.get(ncp);
+				if(subCompositionReplaceMap!=null){
+					String s2 = subCompositionReplaceMap.get(cp);
+					if(s2!=null){
+						s=s2;
+						i += Character.charCount(ncp);
+					}
+				}
+			}
 			if(s==null){
 				// 置換なし
 				buf.appendCodePoint(cp);
@@ -90,7 +121,6 @@ public class CharacterConverter {
 				System.err.printf("U+%X=>%s", cp, s);
 				buf.append(s);
 			}
-			i += Character.charCount(cp);
 		}
 		return buf.toString();
 	}
