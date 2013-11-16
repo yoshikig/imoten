@@ -492,12 +492,20 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		} else {
 			String disposition = p.getDisposition();
 			try{
-				parentPart.addBodyPart((BodyPart)p);
 				if(p instanceof MimeBodyPart){
-					if(((MimeBodyPart)p).getContentID()!=null){
+					String contentId = ((MimeBodyPart)p).getContentID();
+					if(contentId!=null){
 						isInlineImage = true;
+						/*
+						 * ドコモが <> をつけないContent-IDのメールを送ってくるので <> をつける。
+						 * Content-IDはMessage-IDと同じルールが適用されるので <> なしはRFC違反。
+						 */
+						if(!contentId.matches("^<.*")){
+							((MimeBodyPart)p).setContentID("<" + contentId + ">");
+						}
 					}
 				}
+				parentPart.addBodyPart((BodyPart)p);
 			}catch(ClassCastException e){
 				// メールがマルチパートではなく本文が添付ファイルだけの場合は、マルチパートにして添付ファイルをつける
 				try {
