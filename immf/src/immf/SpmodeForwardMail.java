@@ -23,6 +23,7 @@
 package immf;
 
 import java.io.IOException;
+import java.lang.IllegalStateException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -89,7 +90,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private AddressBook addressBook;
 	private String mailAddrCharset = "ISO-2022-jP";
 
-	public SpmodeForwardMail(Message sm, Config conf, AddressBook addressBook) throws EmailException{
+	public SpmodeForwardMail(Message sm, Config conf, AddressBook addressBook) throws EmailException, IllegalStateException{
 		this.smm = sm;
 		this.conf = conf;
 		this.addressBook = addressBook;
@@ -230,12 +231,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			if(conf.getConfigId() == 1){
 				log.info("spモードメールを転送\n"+headerInfo);
 			}
-
-			try {
-				byte contentData[] = Util.inputstream2bytes(smm.getInputStream());
-				log.debug("Content-Type:"+smm.getContentType());
-				log.debug("Content[\n"+new String(contentData)+"\n]");
-			} catch (IOException e) {}
 
 			// テキストパートを取得
 			parseTextPart(smm);

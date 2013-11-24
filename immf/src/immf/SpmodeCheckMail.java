@@ -35,6 +35,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.lang.IllegalStateException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 //import java.util.Date;
@@ -200,19 +201,24 @@ public class SpmodeCheckMail implements Runnable{
 					appNotifications.pushPrepare(0, messages.length - start - 1);
 					for (int index = start + 1; index < messages.length; index++) {
 						msg = messages[index];
+						String id = "";
 						try {
 							byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
 							log.debug("Content-Type:"+msg.getContentType());
 							log.debug("Content[\n"+new String(contentData)+"\n]");
-						} catch (IOException e) {}
+						}catch(Exception e){}
 
 						try{
-							thisId = msg.getHeader("Message-ID")[0];
-							log.info("メール転送:"+index+","+thisId);
-							this.forward(msg, thisId);
+							id = msg.getHeader("Message-ID")[0]; 
+							log.info("メール転送:"+index+","+id);
+							this.forward(msg, id);
 						}catch(MessagingException me){
 							log.error("メールヘッダ取得失敗",me);
+						}catch(IllegalStateException ie){
+							log.error("フォルダクローズのためリトライします",ie);
+							break;
 						}
+						thisId = id;
 					}
 				}
 				
@@ -257,7 +263,7 @@ public class SpmodeCheckMail implements Runnable{
 	/*
 	 * メールをダウンロードして送信
 	 */
-	private void forward(Message msg, String mailId){
+	private void forward(Message msg, String mailId) throws Exception{
 		String from;
 		try {
 			from = ((InternetAddress)msg.getFrom()[0]).getAddress();
@@ -309,7 +315,7 @@ public class SpmodeCheckMail implements Runnable{
 
 		}catch (Exception e) {
 			log.error("mail["+mailId+"] forward Error.",e);
-			return;
+			throw e;
 		}
 
 		if(mail==null){
