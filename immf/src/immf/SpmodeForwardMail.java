@@ -86,6 +86,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private Map<URL, String> emojiToCode = new HashMap<URL, String>();
 	private MimeMultipart rootMultipart = null;
 	private List<BodyPart> attachedParts = new ArrayList<BodyPart>();
+	private static CharacterConverter docomoCharConv = null;
 
 	private AddressBook addressBook;
 	private String mailAddrCharset = "ISO-2022-jP";
@@ -100,9 +101,20 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		this.mailAddrCharset = this.charset;
 		this.setContentTransferEncoding(this.conf.getContentTransferEncoding());
 
+		/*
+		 * 受信メールがUnicode6.0の絵文字に変換されて届くことから、以下を条件にUnicode絵文字を
+		 * ドコモ絵文字に変換した上で処理を継続する。
+		 *  subject … emojireplace.subject=true または forward.subject.charconvfile=設定なし
+		 *  body … emojireplace.body=noneではない
+		 * 
+		 * docomoCharConvSubjectはsubjectの変換を行うかどうかの判定フラグ
+		 */
+		boolean docomoCharConvSubject = false;
+		
 		if(SpmodeForwardMail.subjectCharConvMap!=null
 				&& SpmodeForwardMail.subjectCharConvMap.containsKey(conf)){
 			this.subjectCharConv = SpmodeForwardMail.subjectCharConvMap.get(conf);
+			docomoCharConvSubject = true;
 		}else{
 			this.subjectCharConv = new CharacterConverter();
 		}
@@ -117,6 +129,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			this.strConv = SpmodeForwardMail.strConvMap.get(conf);
 		}else{
 			this.strConv = new StringConverter();
+		}
+		if(conf.isSubjectEmojiReplace()){
+			docomoCharConvSubject = true;
 		}
 
 		// SMTP Server
@@ -162,11 +177,11 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		try{
 			// ヘッダを取得
 			
-			// XXX
-			// 無限ループ抑止のため X-Mailer をチェックした方がいいか
-			
 			// Subject:
 			smmSubject = smm.getSubject();
+			if(docomoCharConvSubject){
+				smmSubject = SpmodeForwardMail.docomoCharConv.convert(smmSubject);
+			}
 			// Date:
 			try{
 				smmDate = smm.getSentDate();
@@ -247,6 +262,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		this.htmlBody = this.strConv.convert(this.htmlBody);
 
 		Config.BodyEmojiReplace emojiReplace = conf.getBodyEmojiReplace();
+		if(emojiReplace!=Config.BodyEmojiReplace.DontReplace){
+			this.plainBody = SpmodeForwardMail.docomoCharConv.convert(this.plainBody);
+			this.htmlBody = SpmodeForwardMail.docomoCharConv.convert(this.htmlBody);
+		}
 		if(emojiReplace==Config.BodyEmojiReplace.DontReplace){
 			this.setBodyDontReplace();
 		}else if(emojiReplace==Config.BodyEmojiReplace.ToInlineImage){
@@ -490,7 +509,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				if(p instanceof MimeBodyPart){
 					String contentId = ((MimeBodyPart)p).getContentID();
 					if(contentId!=null){
-						isInlineImage = true;
+						if(this.decomeFlg)isInlineImage = true;
 						/*
 						 * ドコモが <> をつけないContent-IDのメールを送ってくるので <> をつける。
 						 * Content-IDはMessage-IDと同じルールが適用されるので <> なしはRFC違反。
@@ -524,7 +543,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// インライン添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
 				log.info("Content-Disposition: INLINE");
-				isInlineImage = true;
+				if(this.decomeFlg)isInlineImage = true;
 			} else if (disposition != null && disposition.equals(Part.ATTACHMENT)) {
 				// 添付ファイル追加処理
 				log.info("Content-Type: "+p.getContentType());
@@ -884,6 +903,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 
 	public static void setGoomojiSubjectCharConv(Map<Config, CharacterConverter> goomojiSubjectCharConvMap) {
 		SpmodeForwardMail.goomojiSubjectCharConvMap = goomojiSubjectCharConvMap;
+	}
+
+	public static void setDocomoCharConv(CharacterConverter docomoCharConv) {
+		SpmodeForwardMail.docomoCharConv = docomoCharConv;
 	}
 
 	public static void setStrConv(Map<Config, StringConverter> strConvMap) {

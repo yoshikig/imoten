@@ -57,6 +57,8 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	private String alwaysBcc;
 	private boolean stripAppleQuote;
 	private boolean editDocomoSubjectPrefix;
+	private boolean ignoreMuaSettings;
+	private boolean sjisconvert = false;
 
 	public SpmodeSendMail(MyWiserMessage sm, Config conf) throws EmailException{
 		this.conf = conf;
@@ -69,9 +71,9 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		this.alwaysBcc = conf.getSenderAlwaysBcc();
 		this.stripAppleQuote = conf.isSenderStripiPhoneQuote();
 		this.editDocomoSubjectPrefix = conf.isSenderDocomoStyleSubject();
+		this.ignoreMuaSettings = conf.isSenderSpmodeNoAddressbook();
 
 		this.setDebug(conf.isMailDebugEnable());
-		this.setCharset("Shift_JIS");
 
 		// SMTP Server
 		this.setHostName("mail.spmode.ne.jp");
@@ -90,13 +92,46 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		}
 
 		try{
+			// すべての宛先を格納
+			addSmmRecipientsList(sm.getEnvelopeReceiver());
+			if(this.alwaysBcc!=null){
+				smmRecipientsList.add(this.alwaysBcc);
+			}
+
+			/*
+			 * Bccを含む宛先がドコモしかいなかったらSJISにしないでUTF8送信（絵文字変換なし）、それ以外はSJISで絵文字変換
+			 * sender.spmode.emojicharsetによって強制的にUTF8かSJISを設定
+			 */
+			String cs = "UTF-8";
+			for (String addr : smmRecipientsList) {
+				String[] m = addr.split("@",2);
+				if(!m[1].equalsIgnoreCase("docomo.ne.jp")){
+					cs = "Shift_JIS";
+					this.sjisconvert = true;
+					break;
+				}
+			}
+			Config.SenderSpmodeEmojiCharset emojiCharset = conf.getSenderSpmodeEmojiCharset();
+			if(emojiCharset==Config.SenderSpmodeEmojiCharset.UTF8){
+				cs = "UTF-8";
+				this.sjisconvert = false;
+			}else if(emojiCharset==Config.SenderSpmodeEmojiCharset.SJIS){
+				cs = "Shift_JIS";
+				this.sjisconvert = true;
+			}
+			this.setCharset(cs);
+
 			// From:
 			InternetAddress smmFromAddr = (InternetAddress) smm.getFrom()[0];
 			if (!smmFromAddr.getAddress().equalsIgnoreCase(mymailaddr)){
 				log.warn("送信元アドレスがspモードのアドレスではないためspモードのアドレスに修正します。");
 				smmFromAddr.setAddress(mymailaddr);
 			}
-			this.setFrom(smmFromAddr.getAddress(), encodeSjisText(smmFromAddr.getPersonal()));
+			if(ignoreMuaSettings){
+				this.setFrom(smmFromAddr.getAddress());
+			}else{
+				this.setFrom(smmFromAddr.getAddress(), encodeCharsetText(smmFromAddr.getPersonal()));
+			}
 
 			Address[] ar;
 			List<String> smmToCcAddrList = new ArrayList<String>();
@@ -107,7 +142,11 @@ public class SpmodeSendMail extends MyHtmlEmail {
 					InternetAddress ia = (InternetAddress) addr;
 					// XXX 無指定だとwindows-31jで、以下の指定をするとiso-2022-jpでエンコードされる。
 					// 混在は文字化けの原因になりそうだが・・・
-					this.addTo(ia.getAddress(), encodeSjisText(ia.getPersonal()));
+					if(ignoreMuaSettings){
+						this.addTo(ia.getAddress());
+					}else{
+						this.addTo(ia.getAddress(), encodeCharsetText(ia.getPersonal()));
+					}
 					smmToCcAddrList.add(ia.getAddress());
 					log.info("To:"+ia.getAddress());
 				}
@@ -117,16 +156,16 @@ public class SpmodeSendMail extends MyHtmlEmail {
 			if (ar != null){
 				for (Address addr : ar){
 					InternetAddress ia = (InternetAddress) addr;
-					this.addCc(ia.getAddress(), encodeSjisText(ia.getPersonal()));
+					if(ignoreMuaSettings){
+						this.addCc(ia.getAddress());
+					}else{
+						this.addCc(ia.getAddress(), encodeCharsetText(ia.getPersonal()));
+					}
 					smmToCcAddrList.add(ia.getAddress());
 					log.info("Cc:"+ia.getAddress());
 				}
 			}
 			// Bcc:
-			addSmmRecipientsList(sm.getEnvelopeReceiver());
-			if(this.alwaysBcc!=null){
-				smmRecipientsList.add(this.alwaysBcc);
-			}
 			List<String> smmBccAddrList = new ArrayList<String>();
 			smmBccAddrList = smmRecipientsList;
 			smmBccAddrList.removeAll(smmToCcAddrList);
@@ -135,10 +174,11 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				log.info("Bcc:"+addr);
 			}
 			// Reply-to:
-			for (Address addr : smm.getReplyTo()){
-				InternetAddress ia = (InternetAddress) addr;
-				this.addReplyTo(ia.getAddress(), encodeSjisText(ia.getPersonal()));
-				log.info("Reply-to:"+ia.getAddress());
+			if(smm.getHeader("Reply-To")!=null){
+				for (String addr : smm.getHeader("Reply-To")){
+					this.addReplyTo(addr);
+					log.info("Reply-to:"+addr);
+				}
 			}
 
 			try {
@@ -178,14 +218,16 @@ public class SpmodeSendMail extends MyHtmlEmail {
 					plainBody = Util.stripAppleQuotedLinesText(plainBody);
 					log.info("引用部省略["+plainBody+"]");
 				}
-				plainBody = SpmodeSendMail.charConv.convert(plainBody, "UTF-8");
+				if(sjisconvert){
+					plainBody = SpmodeSendMail.charConv.convert(plainBody, "UTF-8");
+				}
 				if(!this.plainBody.isEmpty()){
 					plainBody = Util.reverseReplaceUnicodeMapping(plainBody);
-					plainBody = SjisString(plainBody);
+					plainBody = CharsetString(plainBody);
 					
 					//this.setTextMsg(plainBody);
 					MimeBodyPart thisPart = new MimeBodyPart();
-					thisPart.setText(plainBody, "Shift_JIS", "plain");
+					thisPart.setText(plainBody, this.charset, "plain");
 					thisPart.setHeader("Content-Transfer-Encoding", "base64");
 					parentPart.addBodyPart(thisPart);
 				}
@@ -201,14 +243,16 @@ public class SpmodeSendMail extends MyHtmlEmail {
 					htmlBody = Util.stripAppleQuotedLinesHtml(htmlBody);
 					log.info("引用部省略["+htmlBody+"]");
 				}
-				htmlBody = SpmodeSendMail.charConv.convert(htmlBody, "UTF-8");
+				if(sjisconvert){
+					htmlBody = SpmodeSendMail.charConv.convert(htmlBody, "UTF-8");
+				}
 				htmlBody = Util.reverseReplaceUnicodeMapping(htmlBody);
 				htmlBody = HtmlConvert.replaceAllCaseInsenstive(htmlBody,"<meta[^>]*charset[^>]*>",""); //charsetを含むmetaタグの削除
-				htmlBody = SjisString(htmlBody);
+				htmlBody = CharsetString(htmlBody);
 				
 				//this.setHtmlMsg(htmlBody);
 				MimeBodyPart thisPart = new MimeBodyPart();
-				thisPart.setText(htmlBody, "Shift_JIS", "html");
+				thisPart.setText(htmlBody, this.charset, "html");
 				thisPart.setHeader("Content-Transfer-Encoding", "base64");
 				parentPart.addBodyPart(thisPart);
 			} catch (Exception e) {
@@ -309,12 +353,12 @@ public class SpmodeSendMail extends MyHtmlEmail {
 			}
 
 			try {
-				if (smmSubject != null) {
+				if (smmSubject != null && sjisconvert) {
 					smmSubject = SpmodeSendMail.charConv.convertSubject(smmSubject);
 				}
 				if (conf.isSenderUseGoomojiSubject()) {
 					String goomojiSubject = smm.getHeader("X-Goomoji-Subject", null);
-					if (goomojiSubject != null)
+					if (goomojiSubject != null && sjisconvert)
 						smmSubject = SpmodeSendMail.goomojiSubjectCharConv.convertSubject(goomojiSubject);
 				}
 			}catch(Exception e){
@@ -322,7 +366,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				smmSubject = smm.getSubject();
 			}
 
-			msg.setSubject(encodeSjisText(smmSubject));
+			msg.setSubject(encodeCharsetText(smmSubject));
 
 			if(this.conf.getContentTransferEncoding()!=null){
 				msg.setHeader("Content-Transfer-Encoding", this.conf.getContentTransferEncoding());
@@ -337,7 +381,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	public MyHtmlEmail setTextMsg(String plain) throws EmailException {
 		plain = Util.reverseReplaceUnicodeMapping(plain);
 		try{
-			plain = SjisString(plain);
+			plain = CharsetString(plain);
 		}catch (Exception e) {
 			log.error("setTextMsg",e);
 		}
@@ -348,7 +392,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	public MyHtmlEmail setHtmlMsg(String html) throws EmailException {
 		html = Util.reverseReplaceUnicodeMapping(html);
 		try{
-			html = SjisString(html);
+			html = CharsetString(html);
 		}catch (Exception e) {
 			log.error("setHtmlMsg",e);
 		}
@@ -370,28 +414,28 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		}
 	}
 	
-	private String SjisString(String text){
+	private String CharsetString(String text){
 		try {
 			if(text!=null){
-				return new String(text.getBytes("Shift_JIS"),"Shift_JIS");
+				return new String(text.getBytes(this.charset),this.charset);
 			}else{
 				return null;
 			}
 		}catch(Exception e){
-			log.warn("SJIS変換失敗:"+text,e);
+			log.warn(this.charset+"変換失敗:"+text,e);
 			return text;
 		}
 	}
 	
-	private String encodeSjisText(String text){
+	private String encodeCharsetText(String text){
 		try {
 			if(text!=null){
-				return MimeUtility.encodeText(SjisString(text),"Shift_JIS","B");
+				return MimeUtility.encodeText(CharsetString(text),this.charset,"B");
 			}else{
 				return null;
 			}
 		}catch(Exception e){
-			log.warn("SJISエンコード失敗:"+text,e);
+			log.warn(this.charset+"エンコード失敗:"+text,e);
 			return text;
 		}
 	}

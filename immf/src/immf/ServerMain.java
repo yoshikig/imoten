@@ -61,6 +61,7 @@ public class ServerMain {
 	private Map<Config, CharacterConverter> subjectCharConvMap = new HashMap<Config, CharacterConverter>();
 	private Map<Config, CharacterConverter> goomojiSubjectCharConvMap = new HashMap<Config, CharacterConverter>();
 	private Map<Config, StringConverter> strConvMap = new HashMap<Config, StringConverter>();
+	private CharacterConverter docomoCharConv;
 	private SendMailPicker spicker;
 	private int numForwardSite;
 	private boolean doForwading = false;
@@ -118,6 +119,17 @@ public class ServerMain {
 
 		// 転送抑止ドメインリスト読み込み
 		this.loadIgnoreDomainList(this.conf, 1);
+
+		// 処理前にspモードメールのメールボックスから読み出したメールに適用する変換表
+		this.docomoCharConv = new CharacterConverter();
+		for (String file : this.conf.getSpmodeSjisCharConvertFile()){
+			try {
+				this.docomoCharConv.load(new File(file));
+			} catch (Exception e) {
+				log.error("文字変換表("+file+")が読み込めませんでした。",e);
+			}
+		}
+		SpmodeForwardMail.setDocomoCharConv(this.docomoCharConv);
 
 		try{
 			// 前回のcookie

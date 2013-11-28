@@ -51,6 +51,8 @@ public class Config {
 	private String spmodeMailPasswd;
 	// spモードのメールボックスの読み書き属性
 	private boolean spmodeReadonly = true;
+	// spモード関連その他パラメータ
+	private List<String> spmodeSjisCharConvertFile = new ArrayList<String>();
 	private int spmodeUnknownForwardLimit = 10;
 
 	// SMTPサーバ
@@ -227,6 +229,11 @@ public class Config {
 	private boolean senderStripiPhoneQuote = false;
 	private boolean senderDocomoStyleSubject = false;
 	private boolean senderAsync = false;	// trueだと送信を別スレッドで行う。エラー時はエラーメールが転送アドレスに送信される。
+	
+	// spmode用送信設定
+	public enum SenderSpmodeEmojiCharset {SMART,UTF8,SJIS};
+	private SenderSpmodeEmojiCharset senderSpmodeEmojiCharset;
+	private boolean senderSpmodeNoAddressbook = false;
 
 	// 送信用TLS
 	private String senderTlsKeystore;
@@ -306,7 +313,9 @@ public class Config {
 		this.docomoPasswd = 	getString("docomo.passwd", null);
 		this.spmodeMailAddr =	getString("spmode.mail", null);
 		this.spmodeMailPasswd = getString("spmode.passwd", null);
-		this.spmodeReadonly =	getBoolean("spmode.mbox.readonly", this.spmodeReadonly);
+		this.spmodeReadonly =	getBoolean("_spmode.mbox.readonly", this.spmodeReadonly);
+		this.spmodeSjisCharConvertFile =
+			splitComma(getString("_spmode.mbox.sjisconvfile", "../conv/unicode2docomo.csv,../conv/genSb2docomo.csv"));
 		this.spmodeUnknownForwardLimit =	getInt("spmode.unknownforwardlimit", this.spmodeUnknownForwardLimit);
 		this.smtpServer = 		getString("smtp.server", null);
 		this.smtpPort = 		getInt(   "smtp.port", this.smtpPort);
@@ -429,6 +438,15 @@ public class Config {
 		this.senderStripiPhoneQuote = getBoolean("sender.stripiphonequote", this.senderStripiPhoneQuote);
 		this.senderDocomoStyleSubject = getBoolean("sender.docomostylesubject", this.senderDocomoStyleSubject);
 		this.senderAsync = getBoolean("sender.async", this.senderAsync);
+		String s = getString("sender.spmode.emojicharset", "");
+		if(s.equalsIgnoreCase("original")){
+			this.senderSpmodeEmojiCharset = SenderSpmodeEmojiCharset.UTF8;
+		}else if(s.equalsIgnoreCase("legacy")){
+			this.senderSpmodeEmojiCharset = SenderSpmodeEmojiCharset.SJIS;
+		}else{
+			this.senderSpmodeEmojiCharset = SenderSpmodeEmojiCharset.SMART;
+		}
+		this.senderSpmodeNoAddressbook = getBoolean("sender.spmode.noaddressbook", this.senderSpmodeNoAddressbook);
 
 		// 最小値
 		this.checkIntervalSec = Math.max(this.checkIntervalSec, 3);
@@ -595,6 +613,10 @@ public class Config {
 
 	public boolean isSpmodeReadonly() {
 		return spmodeReadonly;
+	}
+
+	public List<String> getSpmodeSjisCharConvertFile(){
+		return spmodeSjisCharConvertFile;
 	}
 
 	public int getSpmodeUnknownForwardLimit() {
@@ -950,6 +972,14 @@ public class Config {
 
 	public int getSenderDuplicationCheckTimeSec() {
 		return senderDuplicationCheckTimeSec;
+	}
+
+	public SenderSpmodeEmojiCharset getSenderSpmodeEmojiCharset() {
+		return senderSpmodeEmojiCharset;
+	}
+
+	public boolean isSenderSpmodeNoAddressbook(){
+		return senderSpmodeNoAddressbook;
 	}
 
 	public List<String> getForwardSubjectCharConvertFile() {
