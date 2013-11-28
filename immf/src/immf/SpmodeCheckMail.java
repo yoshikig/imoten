@@ -215,7 +215,7 @@ public class SpmodeCheckMail implements Runnable{
 						}catch(MessagingException me){
 							log.error("メールヘッダ取得失敗",me);
 						}catch(IllegalStateException ie){
-							log.error("フォルダクローズのためリトライします",ie);
+							log.warn("フォルダクローズのためリトライします",ie);
 							break;
 						}
 						thisId = id;
