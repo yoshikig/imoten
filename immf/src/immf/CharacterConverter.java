@@ -92,6 +92,10 @@ public class CharacterConverter {
 		
 	}
 	
+	public int size(){
+		return replaceMap.size() + compositionReplaceMap.size();
+	}
+	
 	public String convert(String str){
 		if(this.replaceMap.isEmpty()){
 			return str;

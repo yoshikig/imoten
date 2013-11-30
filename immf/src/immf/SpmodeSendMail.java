@@ -112,7 +112,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 				}
 			}
 			Config.SenderSpmodeEmojiCharset emojiCharset = conf.getSenderSpmodeEmojiCharset();
-			if(emojiCharset==Config.SenderSpmodeEmojiCharset.UTF8){
+			if(emojiCharset==Config.SenderSpmodeEmojiCharset.UTF8 || SpmodeSendMail.charConv.size()==0){
 				cs = "UTF-8";
 				this.sjisconvert = false;
 			}else if(emojiCharset==Config.SenderSpmodeEmojiCharset.SJIS){
