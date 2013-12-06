@@ -21,17 +21,14 @@
 
 package immf;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import javax.mail.BodyPart;
-import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
@@ -143,14 +140,6 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 			log.info("From       "+msg.getEnvelopeSender());
 			log.info("Recipients  "+msg.getEnvelopeReceiver());
 
-			if(isImode){
-				log.info("iモード動作モード");
-			}else{
-				log.info("spモード動作モード");
-				SpmodeSendMail spmodeSendMail = new SpmodeSendMail(msg,conf);
-				spmodeSendMail.send();
-				return;
-			}
 			MimeMessage mime = msg.getMimeMessage();
 
 			String messageId = mime.getHeader("Message-ID", null);
@@ -174,15 +163,25 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 				recipients = msg.getEnvelopeReceiver();
 			}
 
+			if(this.alwaysBcc!=null){
+				log.debug("add alwaysbcc "+this.alwaysBcc);
+				recipients.add(this.alwaysBcc);
+			}
+
+			if(isImode){
+				log.info("iモード動作モード");
+			}else{
+				log.info("spモード動作モード");
+				SpmodeSendMail spmodeSendMail = new SpmodeSendMail(mime,recipients,conf);
+				spmodeSendMail.send();
+				return;
+			}
+
 			List<InternetAddress> to = getRecipients(mime, "To");
 			List<InternetAddress> cc = getRecipients(mime, "Cc");
 			List<InternetAddress> bcc = getBccRecipients(recipients,to,cc);
 
 			int maxRecipients = MaxRecipient;
-			if(this.alwaysBcc!=null){
-				log.debug("add alwaysbcc "+this.alwaysBcc);
-				bcc.add(new InternetAddress(this.alwaysBcc));
-			}
 			log.info("To   "+StringUtils.join(to," / "));
 			log.info("cc   "+StringUtils.join(cc," / "));
 			log.info("bcc   "+StringUtils.join(bcc," / "));

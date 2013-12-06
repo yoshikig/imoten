@@ -54,21 +54,15 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	private Config conf;
 	private static CharacterConverter charConv = null;
 	private static CharacterConverter goomojiSubjectCharConv = null;
-	private String alwaysBcc;
 	private boolean stripAppleQuote;
 	private boolean editDocomoSubjectPrefix;
 	private boolean ignoreMuaSettings;
 	private boolean sjisconvert = false;
 
-	public SpmodeSendMail(MyWiserMessage sm, Config conf) throws EmailException{
+	public SpmodeSendMail(MimeMessage sm, List<String> recipients, Config conf) throws EmailException{
 		this.conf = conf;
-		try {
-			this.smm = sm.getMimeMessage();
-		} catch (MessagingException e1) {
-			log.warn("error");
-		}
+		this.smm = sm;
 
-		this.alwaysBcc = conf.getSenderAlwaysBcc();
 		this.stripAppleQuote = conf.isSenderStripiPhoneQuote();
 		this.editDocomoSubjectPrefix = conf.isSenderDocomoStyleSubject();
 		this.ignoreMuaSettings = conf.isSenderSpmodeNoAddressbook();
@@ -93,10 +87,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 
 		try{
 			// すべての宛先を格納
-			addSmmRecipientsList(sm.getEnvelopeReceiver());
-			if(this.alwaysBcc!=null){
-				smmRecipientsList.add(this.alwaysBcc);
-			}
+			addSmmRecipientsList(recipients);
 
 			/*
 			 * Bccを含む宛先がドコモしかいなかったらSJISにしないでUTF8送信（絵文字変換なし）、それ以外はSJISで絵文字変換
