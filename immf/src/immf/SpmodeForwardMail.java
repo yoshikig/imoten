@@ -179,6 +179,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			
 			// Subject:
 			smmSubject = smm.getSubject();
+			if (smmSubject==null){
+				smmSubject = "";
+			}
 			if(docomoCharConvSubject){
 				smmSubject = SpmodeForwardMail.docomoCharConv.convert(smmSubject);
 			}
@@ -298,6 +301,27 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					parsePart(p, rootMultipart);
 				}
 			}
+			
+			// XXX textとhtmlだけのメールはparsePartのmultipart処理でemoji追加ルートに入らない
+			// それを拾うためのもの。
+			if(emojiToCid.size()>0){
+				log.info("未添付の絵文字追加");
+				MimeMultipart newMimeMultipart = new MimeMultipart("related");
+				Multipart mp = getContainer();
+				
+				for (int i = 0; i < mp.getCount(); i++) {
+					BodyPart childBodyPart = mp.getBodyPart(i);
+					log.info("move part: "+childBodyPart.getContentType());
+					mp.removeBodyPart(childBodyPart);
+					newMimeMultipart.addBodyPart(childBodyPart);
+				}
+
+				addEmojiPart(newMimeMultipart);
+
+				MimeBodyPart newPart = new MimeBodyPart();
+				newPart.setContent(newMimeMultipart);
+				mp.addBodyPart(newPart);
+			}
 		}catch (MessagingException e){
 			log.error(e);
 		}
@@ -376,21 +400,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 						MimeBodyPart newPartRelated = new MimeBodyPart();
 						newPartRelated.setContent(newMimeMultipartRelated);
 						newMimeMultipartRelated.addBodyPart(newPartAlt);
-						
-						for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
-							URL url = e.getKey();
-							String cid = e.getValue();
-							String name = emojiToCode.get(url);
-
-							MimeBodyPart mbp = new MimeBodyPart();
-							mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
-							mbp.setFileName(name);
-							mbp.setDisposition("inline");
-							mbp.setContentID("<" + cid + ">");
-							
-							log.info("絵文字追加:"+name);
-							newMimeMultipartRelated.addBodyPart(mbp);
-						}
+						addEmojiPart(newMimeMultipartRelated);
 						parentPart.addBodyPart(newPartRelated);
 						
 					}else{
@@ -480,21 +490,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					newMimeMultipart.setSubType("related");
 				}
 				
-				for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
-					URL url = e.getKey();
-					String cid = e.getValue();
-					String code = emojiToCode.get(url);
-
-					MimeBodyPart mbp = new MimeBodyPart();
-					mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
-					mbp.setFileName(code);
-					mbp.setDisposition("inline");
-					mbp.setContentID("<" + cid + ">");
-					
-					log.info("絵文字追加:"+code);
-					newMimeMultipart.addBodyPart(mbp);
-				}
-
+				addEmojiPart(newMimeMultipart);
 			}
 			
 			MimeBodyPart newPart = new MimeBodyPart();
@@ -563,6 +559,28 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		}catch (Exception e) {
 		}
 		return "";
+	}
+
+	private void addEmojiPart(MimeMultipart parentPart) throws MessagingException{
+		List<URL> urls = new ArrayList<URL>();
+		for (Map.Entry<URL, String> e : emojiToCid.entrySet()){
+			URL url = e.getKey();
+			String cid = e.getValue();
+			String name = emojiToCode.get(url);
+
+			MimeBodyPart mbp = new MimeBodyPart();
+			mbp.setDataHandler(new DataHandler(new URLDataSource(url)));
+			mbp.setFileName(name);
+			mbp.setDisposition("inline");
+			mbp.setContentID("<" + cid + ">");
+			
+			log.info("絵文字追加:"+name);
+			parentPart.addBodyPart(mbp);
+			urls.add(url);
+		}
+		for (URL url : urls){
+			emojiToCid.remove(url);
+		}
 	}
 
 	/*

@@ -23,6 +23,7 @@ package immf;
 
 import immf.growl.GrowlNotifier;
 
+import javax.mail.AuthenticationFailedException;
 import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -36,7 +37,6 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.IllegalStateException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 //import java.util.Date;
 import java.util.HashMap;
@@ -47,6 +47,9 @@ import java.util.Properties;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.mail.EmailException;
+
+import com.sun.mail.imap.IMAPFolder;
 
 public class SpmodeCheckMail implements Runnable{
 	private static final Log log = LogFactory.getLog(ServerMain.class);
@@ -92,25 +95,59 @@ public class SpmodeCheckMail implements Runnable{
 	}
 
 	public void run() {
+		String myname = "";
+		String passwd = "";
+
+		String protocol = conf.getSpmodeProtocol();
 		Properties props = new Properties();
-		props.setProperty("mail.pop3.host", "mail.spmode.ne.jp");
-		props.setProperty("mail.pop3.port", "995");
-		props.setProperty("mail.pop3.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-		props.setProperty("mail.pop3.socketFactory.fallback", "false");
-		props.setProperty("mail.pop3.socketFactory.port", "995");
 
-		// XXX 設定可能にする？
-		//props.setProperty("mail.pop3.connectiontimeout", XXX);
-		//props.setProperty("mail.pop3.timeout", XXX);
+		if(protocol.equalsIgnoreCase("pop3")){
+			log.info("spmode: pop3");
+			props.setProperty("mail.pop3.host", "mail.spmode.ne.jp");
+			props.setProperty("mail.pop3.port", "995");
+			props.setProperty("mail.pop3.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+			props.setProperty("mail.pop3.socketFactory.fallback", "false");
+			props.setProperty("mail.pop3.socketFactory.port", "995");
 
-		final String myname = conf.getSpmodeMailUser();
-		final String passwd = conf.getSpmodeMailPasswd();
+			// XXX 設定可能にする？
+			//props.setProperty("mail.pop3.connectiontimeout", XXX);
+			//props.setProperty("mail.pop3.timeout", XXX);
+
+			myname = conf.getSpmodeMailUser();
+			passwd = conf.getSpmodeMailPasswd();
+		}else{
+			log.info("spmode: imap");
+			props.setProperty("mail.imap.host", "imap2.spmode.ne.jp");
+			props.setProperty("mail.imap.port", "993");
+			props.setProperty("mail.imap.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
+			props.setProperty("mail.imap.socketFactory.fallback", "false");
+			props.setProperty("mail.imap.socketFactory.port", "993");
+
+			//props.setProperty("mail.imap.connectiontimeout", XXX);
+			//props.setProperty("mail.imap.timeout", XXX);
+
+			myname = conf.getDocomoId();
+			passwd = conf.getDocomoPasswd();
+		}
 
 		// 読み込みは初回起動時のみ
 		this.loadAddressBook();
 
 		//Date lastUpdate = null;
+		boolean rcvFailFlg = false;
+		boolean fwdFailFlg = false;
+		int intervalSec = 0;
+		int fwdRetryLimit = conf.getForwardRetryMaxCount();
+		int fwdRetryCount = 0;
+		Folder folder = null;
 		while(true){
+			if (rcvFailFlg){
+				intervalSec = Math.min(3600, intervalSec*2);
+			}else if(fwdFailFlg){
+				intervalSec = conf.getForwardRetryIntervalSec();
+			}else{
+				intervalSec = conf.getSpmodeCheckIntervalSec();
+			}
 			/*
 			if(lastUpdate != null){
 				// 接続フラグを見るためにステータスファイルをチェック
@@ -133,10 +170,10 @@ public class SpmodeCheckMail implements Runnable{
 				Session session = Session.getInstance(props, null);
 				session.setDebug(conf.isMailDebugEnable());
 				
-				Store store = session.getStore("pop3");
+				Store store = session.getStore(protocol);
 				store.connect(myname, passwd);
 				
-				Folder folder = store.getDefaultFolder();
+				folder = store.getDefaultFolder();
 				folder = folder.getFolder("INBOX");
 				if(conf.isSpmodeReadonly()){
 					folder.open(Folder.READ_ONLY);
@@ -149,31 +186,29 @@ public class SpmodeCheckMail implements Runnable{
 				}
 
 				Message messages[] = folder.getMessages();
+				int messageLength = folder.getMessageCount();
+				while(messages.length<messageLength){
+					//メール受信完了まで待つ
+					try{
+						Thread.sleep(500);
+					}catch (Exception e) {}
+				}
 				if(StringUtils.isBlank(this.status.getLastSpMsgId())){
 					//IDが未設定の時
-					Message msg = messages[messages.length-1];
-					try {
-						thisId = msg.getHeader("Message-ID")[0];
-					}catch(MessagingException me){
-						// XXX メールヘッダをダンプするコードを入れておくべき。以下同文
-						log.error("メールヘッダ取得失敗",me);
-					}
+					Message msg = messages[messageLength-1];
+					thisId = msg.getHeader("Message-ID")[0];
 				}else{
 					String lastId = this.status.getLastSpMsgId();
 					//IDが設定されてた時、当該IDのメールを降順(新しいメールから順)に探す
 					int start = -1;
 					Message msg;
-					for (int index = messages.length-1; index >= 0; index--) {
+					for (int index = messageLength-1; index >= 0; index--) {
 						msg = messages[index];
-						try{
-							thisId = msg.getHeader("Message-ID")[0];
-							//log.info("ID探索:"+index+","+thisId);
-							if (thisId.equals(lastId)) {
-								start = index;
-								break;
-							}
-						}catch(MessagingException me){
-							log.error("メールヘッダ取得失敗",me);
+						thisId = msg.getHeader("Message-ID")[0];
+						log.info("ID探索:"+index+","+thisId);
+						if (thisId.equals(lastId)) {
+							start = index;
+							break;
 						}
 					}
 					
@@ -181,15 +216,11 @@ public class SpmodeCheckMail implements Runnable{
 					int recievemax = this.unknownForwardLimit;
 					if (start < 0 && recievemax >= 0 && !lastId.equals(InitialId)){
 						log.warn("最後に取得したメールが発見できなかったため最新の" + recievemax + "通(spmode.unknownforwardlimit)を上限としてメール転送します");
-						start = messages.length - Math.min(messages.length,recievemax) - 1;
+						start = messageLength - Math.min(messageLength,recievemax) - 1;
 						
 						//IDを最新メールに再設定する
-						if(messages.length>0){
-							try{
-								thisId = messages[messages.length-1].getHeader("Message-ID")[0];
-							}catch(MessagingException me){
-								log.error("メールヘッダ取得失敗",me);
-							}
+						if(messageLength>0){
+							thisId = messages[messageLength-1].getHeader("Message-ID")[0];
 						}else{
 							//メールボックスが空なので次回からすべてのメールを再転送する
 							thisId = InitialId;
@@ -197,9 +228,9 @@ public class SpmodeCheckMail implements Runnable{
 					}
 					
 					//メールの取得と転送
-					log.info("転送するメールIDの数 "+(messages.length - start - 1));
-					appNotifications.pushPrepare(0, messages.length - start - 1);
-					for (int index = start + 1; index < messages.length; index++) {
+					log.info("転送するメールIDの数 "+(messageLength - start - 1));
+					appNotifications.pushPrepare(0, messageLength - start - 1);
+					for (int index = start + 1; index < messageLength; index++) {
 						msg = messages[index];
 						String id = "";
 						try {
@@ -208,24 +239,72 @@ public class SpmodeCheckMail implements Runnable{
 							log.debug("Content[\n"+new String(contentData)+"\n]");
 						}catch(Exception e){}
 
+						id = msg.getHeader("Message-ID")[0]; 
+						log.info("メール転送:"+index+","+id);
+							
+						// リトライ上限に達している場合はforwardの成否に関わらずidを設定して次メールへ進む
+						if(fwdRetryLimit>0 && fwdRetryCount>=fwdRetryLimit){
+							thisId = id;
+							fwdRetryCount = 0;
+						}
 						try{
-							id = msg.getHeader("Message-ID")[0]; 
-							log.info("メール転送:"+index+","+id);
 							this.forward(msg, id);
-						}catch(MessagingException me){
-							log.error("メールヘッダ取得失敗",me);
-						}catch(IllegalStateException ie){
-							log.warn("フォルダクローズのためリトライします",ie);
-							break;
+						}catch(Exception e){
+							throw e;
 						}
 						thisId = id;
+						rcvFailFlg = false;
+						fwdFailFlg = false;
+						fwdRetryCount = 0;
 					}
 				}
 				
-				folder.close(false);
-				store.close();
+				/*
+				if(folder.isOpen()){
+					folder.close(false);
+				}
+				if(store.isConnected()){
+					store.close();
+				}
+				*/
+			} catch(AuthenticationFailedException afe){
+				if (afe.getMessage().equalsIgnoreCase("Unknown User")){
+					log.error("ユーザ名またはパスワードが間違っています。受信メールのチェックを終了します。",afe);
+					return;
+				} else {
+					// Transaction failed
+					log.warn("spモードメールサーバメンテナンス中により認証失敗。間隔を置いてリトライします。",afe);
+					if(!rcvFailFlg){
+						intervalSec = 600;
+						rcvFailFlg = true;
+					}
+				}
+			} catch(MessagingException me){
+				log.warn("ドコモメールサーバ接続時に例外発生",me);
+				if(!rcvFailFlg){
+					intervalSec = 60;
+					rcvFailFlg = true;
+				}
+			} catch(IllegalStateException ie){
+				log.warn("フォルダクローズのためリトライします",ie);
+				if(!rcvFailFlg){
+					intervalSec = 10;
+					rcvFailFlg = true;
+				}
+			} catch(EmailException ee){
+				if(fwdFailFlg && fwdRetryCount==0){
+					log.error("spモードメール転送エラー、リトライで回復せずメール転送中止。",ee);
+					fwdFailFlg = false;
+				}else{
+					if(!fwdFailFlg){
+						// 初回
+						fwdFailFlg = true;
+					}
+					log.warn("spモードメール転送エラー、後でメール転送リトライします。",ee);
+					fwdRetryCount++;
+				}
 			} catch(Exception e) {
-				log.error("メールサーバ接続時に例外発生",e);
+				log.error("例外発生",e);
 			}
 					
 			/*
@@ -254,9 +333,23 @@ public class SpmodeCheckMail implements Runnable{
 			//lastUpdate = new Date();
 
 			// 次のチェックまで待つ
-			try{
-				Thread.sleep(conf.getSpmodeCheckIntervalSec()*1000);
-			}catch (Exception e) {}
+			if (!rcvFailFlg && !fwdFailFlg && folder.isOpen() && folder instanceof IMAPFolder) {
+				try{
+					IMAPFolder f = (IMAPFolder)folder;
+					log.info("IMAP IDLE開始");
+					f.idle(true);
+					log.info("IMAP IDLE完了");
+				}catch(Exception e){
+					log.warn("例外発生",e);
+					try{
+						Thread.sleep(intervalSec*1000);
+					}catch (Exception e2) {}
+				}
+			}else{
+				try{
+					Thread.sleep(intervalSec*1000);
+				}catch (Exception e) {}
+			}
 		}
 
 	}
@@ -314,7 +407,7 @@ public class SpmodeCheckMail implements Runnable{
 			}
 
 		}catch (Exception e) {
-			log.error("mail["+mailId+"] forward Error.",e);
+			log.error("mail["+mailId+"] forward Error.");
 			throw e;
 		}
 

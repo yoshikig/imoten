@@ -50,6 +50,7 @@ public class Config {
 	private String spmodeMailAddr;
 	private String spmodeMailPasswd;
 	// spモードのメールボックスの読み書き属性
+	private String spmodeProtocol = "pop3";
 	private boolean spmodeReadonly = true;
 	// spモード関連その他パラメータ
 	private List<String> spmodeSjisCharConvertFile = new ArrayList<String>();
@@ -313,6 +314,9 @@ public class Config {
 		this.docomoPasswd = 	getString("docomo.passwd", null);
 		this.spmodeMailAddr =	getString("spmode.mail", null);
 		this.spmodeMailPasswd = getString("spmode.passwd", null);
+		if(!getString("spmode.protocol", this.spmodeProtocol).equalsIgnoreCase("pop3")){
+				this.spmodeProtocol = "imap";
+		}
 		this.spmodeReadonly =	getBoolean("_spmode.mbox.readonly", this.spmodeReadonly);
 		this.spmodeSjisCharConvertFile =
 			splitComma(getString("_spmode.mbox.sjisconvfile", "../conv/unicode2docomo.csv,../conv/genSb2docomo.csv"));
@@ -609,6 +613,10 @@ public class Config {
 
 	public String getSpmodeMailPasswd() {
 		return spmodeMailPasswd;
+	}
+
+	public String getSpmodeProtocol() {
+		return spmodeProtocol;
 	}
 
 	public boolean isSpmodeReadonly() {

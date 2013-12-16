@@ -60,6 +60,10 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	private boolean sjisconvert = false;
 
 	public SpmodeSendMail(MimeMessage sm, List<String> recipients, Config conf) throws EmailException{
+		String protocol = conf.getSpmodeProtocol();
+		String myname = "";
+		String passwd = "";
+
 		this.conf = conf;
 		this.smm = sm;
 
@@ -70,16 +74,22 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		this.setDebug(conf.isMailDebugEnable());
 
 		// SMTP Server
-		this.setHostName("mail.spmode.ne.jp");
+		if(protocol.equalsIgnoreCase("pop3")){
+			this.setHostName("mail.spmode.ne.jp");
+			myname = conf.getSpmodeMailUser();
+			passwd = conf.getSpmodeMailPasswd();
+		}else{
+			this.setHostName("smtp.spmode.ne.jp");
+			myname = conf.getDocomoId();
+			passwd = conf.getDocomoPasswd();
+		}
 		this.setSmtpPort(465);
 		this.setSocketConnectionTimeout(conf.getSmtpConnectTimeoutSec()*1000);
 		this.setSocketTimeout(conf.getSmtpTimeoutSec()*1000);
 		this.setSSL(true);
 		
-		String myname = conf.getSpmodeMailUser();
 		// あえてimoten.ini設定値を使わないでハードコード
-		String mymailaddr = myname + "@docomo.ne.jp";
-		String passwd = conf.getSpmodeMailPasswd();
+		String mymailaddr = conf.getSpmodeMailUser() + "@docomo.ne.jp";
 
 		if(myname!=null&&passwd!=null){
 			this.setAuthentication(myname, passwd);
