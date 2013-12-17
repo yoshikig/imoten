@@ -465,9 +465,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 
 				// インラインではない添付ファイルを related の外に出すための処理
 				if(!inlineParsed && conf.isForwardFixMultipartRelated()){
-					if(!childContentType.startsWith("multipart/")
+					if(!childContentType.toLowerCase().startsWith("multipart/")
 							&& ((childDisposition != null && childDisposition.equals(Part.ATTACHMENT))
-									|| !childContentType.startsWith("text/"))) {
+									|| !childContentType.toLowerCase().startsWith("text/"))) {
 						log.info("move part: "+childBodyPart.getFileName());
 						newMimeMultipart.removeBodyPart(childBodyPart);
 						attachedParts.add(childBodyPart);
