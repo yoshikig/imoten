@@ -25,6 +25,7 @@ import immf.growl.GrowlNotifier;
 
 import javax.mail.AuthenticationFailedException;
 import javax.mail.Folder;
+import javax.mail.FolderClosedException;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Session;
@@ -37,6 +38,7 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.IllegalStateException;
+import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 //import java.util.Date;
 import java.util.HashMap;
@@ -336,9 +338,14 @@ public class SpmodeCheckMail implements Runnable{
 			if (!rcvFailFlg && !fwdFailFlg && folder.isOpen() && folder instanceof IMAPFolder) {
 				try{
 					IMAPFolder f = (IMAPFolder)folder;
+					Thread ImapIdleTimer = new Thread(new ImapIdleTimer());
+					ImapIdleTimer.setUncaughtExceptionHandler(new ImapFolderCloser(f));
+					ImapIdleTimer.start();
 					log.info("IMAP IDLE開始");
 					f.idle(true);
 					log.info("IMAP IDLE完了");
+				}catch(FolderClosedException fce){
+					log.info("IMAP IDLE中断(サーバとの接続が切断されました)");
 				}catch(Exception e){
 					log.warn("例外発生",e);
 					try{
@@ -352,6 +359,26 @@ public class SpmodeCheckMail implements Runnable{
 			}
 		}
 
+	}
+	class ImapIdleTimer implements Runnable {
+		public void run() {
+			try{
+				// 10分弱待つ
+				Thread.sleep(590*1000);
+			}catch(Exception e){}
+			throw new RuntimeException();
+		}
+	}
+	class ImapFolderCloser implements UncaughtExceptionHandler {
+		private IMAPFolder folder;
+		public ImapFolderCloser(IMAPFolder f) {
+			folder = f;
+		}
+		public void uncaughtException(Thread thread, Throwable throwable) {
+			try{
+				folder.close(false);
+			}catch(Exception e){}
+		}
 	}
 	/*
 	 * メールをダウンロードして送信

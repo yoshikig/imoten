@@ -204,7 +204,7 @@ public class ServerMain {
 
 		if(this.doForwading) {
 			// iモードメール着信監視
-			if(this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
+			if(this.conf.isImodenetEnable()&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
 				ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
 				Thread ti = new Thread(imodeChecker);
 				ti.setName("ImodeChecker");
@@ -213,12 +213,16 @@ public class ServerMain {
 			}
 		
 			// spモードメール着信監視
-			if(this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
-				SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this);
-				Thread ts = new Thread(spmodeChecker);
-				ts.setName("SpmodeChecker");
-				ts.setDaemon(true);
-				ts.start();
+			if(this.conf.isSpmodeEnable()){
+				String protocol = conf.getSpmodeProtocol();
+				if((protocol.equalsIgnoreCase("pop3")&&this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null)
+						|| this.conf.getSpmodeMailUser()!=null){
+					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this);
+					Thread ts = new Thread(spmodeChecker);
+					ts.setName("SpmodeChecker");
+					ts.setDaemon(true);
+					ts.start();
+				}
 			}
 		}
 		

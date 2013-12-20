@@ -56,6 +56,10 @@ public class Config {
 	private List<String> spmodeSjisCharConvertFile = new ArrayList<String>();
 	private int spmodeUnknownForwardLimit = 10;
 
+	// imode.net、spモード有効無効スイッチ
+	private boolean imodenetEnable = true;
+	private boolean spmodeEnable = true;
+
 	// SMTPサーバ
 	private String smtpServer;
 	private int smtpPort = 25;
@@ -310,6 +314,8 @@ public class Config {
 
 	private void getProperties(){
 
+		this.imodenetEnable =	getBoolean("imodenet.enable", this.imodenetEnable);
+		this.spmodeEnable =		getBoolean("spmode.enable", this.spmodeEnable);
 		this.docomoId = 		getString("docomo.id", null);
 		this.docomoPasswd = 	getString("docomo.passwd", null);
 		this.spmodeMailAddr =	getString("spmode.mail", null);
@@ -589,6 +595,14 @@ public class Config {
 
 	public int getConfigId(){
 		return configId;
+	}
+
+	public boolean isImodenetEnable() {
+		return imodenetEnable;
+	}
+
+	public boolean isSpmodeEnable() {
+		return spmodeEnable;
 	}
 
 	public String getDocomoId() {
