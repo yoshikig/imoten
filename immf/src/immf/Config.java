@@ -50,11 +50,12 @@ public class Config {
 	private String spmodeMailAddr;
 	private String spmodeMailPasswd;
 	// spモードのメールボックスの読み書き属性
-	private String spmodeProtocol = "pop3";
+	private String spmodeProtocol = "imap";
 	private boolean spmodeReadonly = true;
 	// spモード関連その他パラメータ
 	private List<String> spmodeSjisCharConvertFile = new ArrayList<String>();
 	private int spmodeUnknownForwardLimit = 10;
+	private boolean spmodeLeaveSeenFlag = false;
 
 	// imode.net、spモード有効無効スイッチ
 	private boolean imodenetEnable = true;
@@ -320,13 +321,14 @@ public class Config {
 		this.docomoPasswd = 	getString("docomo.passwd", null);
 		this.spmodeMailAddr =	getString("spmode.mail", null);
 		this.spmodeMailPasswd = getString("spmode.passwd", null);
-		if(!getString("spmode.protocol", this.spmodeProtocol).equalsIgnoreCase("pop3")){
-				this.spmodeProtocol = "imap";
+		if(!getString("spmode.protocol", this.spmodeProtocol).equalsIgnoreCase("imap")){
+				this.spmodeProtocol = "pop3";
 		}
 		this.spmodeReadonly =	getBoolean("_spmode.mbox.readonly", this.spmodeReadonly);
 		this.spmodeSjisCharConvertFile =
 			splitComma(getString("_spmode.mbox.sjisconvfile", "../conv/unicode2docomo.csv,../conv/genSb2docomo.csv"));
 		this.spmodeUnknownForwardLimit =	getInt("spmode.unknownforwardlimit", this.spmodeUnknownForwardLimit);
+		this.spmodeLeaveSeenFlag =	getBoolean("spmode.forceseen", this.spmodeLeaveSeenFlag);
 		this.smtpServer = 		getString("smtp.server", null);
 		this.smtpPort = 		getInt(   "smtp.port", this.smtpPort);
 		this.smtpConnectTimeoutSec = getInt("smtp.connecttimeout", this.smtpConnectTimeoutSec);
@@ -643,6 +645,10 @@ public class Config {
 
 	public int getSpmodeUnknownForwardLimit() {
 		return spmodeUnknownForwardLimit;
+	}
+
+	public boolean getSpmodeLeaveSeenFlag() {
+		return spmodeLeaveSeenFlag;
 	}
 
 	public String getGmailId() {

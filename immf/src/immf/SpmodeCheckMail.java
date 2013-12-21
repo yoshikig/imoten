@@ -275,10 +275,12 @@ public class SpmodeCheckMail implements Runnable{
 						forwarded = true;
 						
 						// 未読フラグのセットでエラーが発生しても転送リトライしない
-						if(folder instanceof IMAPFolder && folder.getMode()==Folder.READ_WRITE){
+						if(folder instanceof IMAPFolder && !conf.getSpmodeLeaveSeenFlag() && folder.getMode()==Folder.READ_WRITE){
 							try{
 								msg.setFlag(Flags.Flag.SEEN, seen);
-								if(!seen){
+								if(seen){
+									log.info("メッセージ"+id+"は開封済み状態です");
+								}else{
 									log.info("メッセージ"+id+"を未読状態に戻しました");
 								}
 							}catch(MessagingException e){}
