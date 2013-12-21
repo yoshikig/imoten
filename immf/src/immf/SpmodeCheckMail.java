@@ -24,6 +24,7 @@ package immf;
 import immf.growl.GrowlNotifier;
 
 import javax.mail.AuthenticationFailedException;
+import javax.mail.Flags;
 import javax.mail.Folder;
 import javax.mail.FolderClosedException;
 import javax.mail.Message;
@@ -142,6 +143,8 @@ public class SpmodeCheckMail implements Runnable{
 		int fwdRetryLimit = conf.getForwardRetryMaxCount();
 		int fwdRetryCount = 0;
 		Folder folder = null;
+		Session session = null;
+		Store store = null;
 		while(true){
 			if (rcvFailFlg){
 				intervalSec = Math.min(3600, intervalSec*2);
@@ -169,15 +172,17 @@ public class SpmodeCheckMail implements Runnable{
 
 			String thisId = "";
 			try{
-				Session session = Session.getInstance(props, null);
-				session.setDebug(conf.isMailDebugEnable());
+				if(store==null || !store.isConnected()){
+					session = Session.getInstance(props, null);
+					session.setDebug(conf.isMailDebugEnable());
 				
-				Store store = session.getStore(protocol);
-				store.connect(myname, passwd);
+					store = session.getStore(protocol);
+					store.connect(myname, passwd);
+				}
 				
 				folder = store.getDefaultFolder();
 				folder = folder.getFolder("INBOX");
-				if(conf.isSpmodeReadonly()){
+				if(conf.isSpmodeReadonly() && !(folder instanceof IMAPFolder)){
 					folder.open(Folder.READ_ONLY);
 				}else{
 					try{
@@ -234,6 +239,7 @@ public class SpmodeCheckMail implements Runnable{
 					appNotifications.pushPrepare(0, messageLength - start - 1);
 					for (int index = start + 1; index < messageLength; index++) {
 						msg = messages[index];
+						boolean seen = msg.isSet(Flags.Flag.SEEN);
 						String id = "";
 						try {
 							byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
@@ -258,20 +264,25 @@ public class SpmodeCheckMail implements Runnable{
 						rcvFailFlg = false;
 						fwdFailFlg = false;
 						fwdRetryCount = 0;
+						
+						// 未読フラグのセットでエラーが発生しても転送リトライしない
+						if(folder instanceof IMAPFolder && folder.getMode()==Folder.READ_WRITE){
+							try{
+								msg.setFlag(Flags.Flag.SEEN, seen);
+								if(!seen){
+									log.info("メッセージ"+id+"を未読状態に戻しました");
+								}
+							}catch(MessagingException e){}
+						}
 					}
 				}
 				
-				/*
-				if(folder.isOpen()){
-					folder.close(false);
-				}
-				if(store.isConnected()){
-					store.close();
-				}
-				*/
 			} catch(AuthenticationFailedException afe){
 				if (afe.getMessage().equalsIgnoreCase("Unknown User")){
-					log.error("ユーザ名またはパスワードが間違っています。受信メールのチェックを終了します。",afe);
+					log.error("spモードメール(pop3)のユーザ名またはパスワードが間違っています。受信メールのチェックを終了します。",afe);
+					return;
+				} else if (afe.getMessage().equalsIgnoreCase("authenticate failed")){
+					log.error("ドコモメールの利用開始設定がされていないか、docomoIDかパスワードの設定が間違っています。受信メールのチェックを終了します。",afe);
 					return;
 				} else {
 					// Transaction failed
@@ -353,6 +364,11 @@ public class SpmodeCheckMail implements Runnable{
 					}catch (Exception e2) {}
 				}
 			}else{
+				try{
+					if(folder.isOpen()){
+						folder.close(false);
+					}
+				}catch (MessagingException e){}
 				try{
 					Thread.sleep(intervalSec*1000);
 				}catch (Exception e) {}
