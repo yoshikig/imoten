@@ -146,6 +146,7 @@ public class SpmodeCheckMail implements Runnable{
 		Session session = null;
 		Store store = null;
 		while(true){
+			boolean forwarded = false;
 			if (rcvFailFlg){
 				intervalSec = Math.min(3600, intervalSec*2);
 			}else if(fwdFailFlg){
@@ -264,6 +265,7 @@ public class SpmodeCheckMail implements Runnable{
 						rcvFailFlg = false;
 						fwdFailFlg = false;
 						fwdRetryCount = 0;
+						forwarded = true;
 						
 						// 未読フラグのセットでエラーが発生しても転送リトライしない
 						if(folder instanceof IMAPFolder && folder.getMode()==Folder.READ_WRITE){
@@ -348,6 +350,9 @@ public class SpmodeCheckMail implements Runnable{
 			// 次のチェックまで待つ
 			if (!rcvFailFlg && !fwdFailFlg && folder.isOpen() && folder instanceof IMAPFolder) {
 				try{
+					if(forwarded){
+						continue;
+					}
 					IMAPFolder f = (IMAPFolder)folder;
 					Thread ImapIdleTimer = new Thread(new ImapIdleTimer());
 					ImapIdleTimer.setUncaughtExceptionHandler(new ImapFolderCloser(f));
