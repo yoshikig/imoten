@@ -41,7 +41,7 @@ import java.io.IOException;
 import java.lang.IllegalStateException;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
-//import java.util.Date;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -137,6 +137,7 @@ public class SpmodeCheckMail implements Runnable{
 		this.loadAddressBook();
 
 		//Date lastUpdate = null;
+		Date initialCheckDate = null;
 		boolean rcvFailFlg = false;
 		boolean fwdFailFlg = false;
 		int intervalSec = 0;
@@ -195,12 +196,6 @@ public class SpmodeCheckMail implements Runnable{
 
 				Message messages[] = folder.getMessages();
 				int messageLength = folder.getMessageCount();
-				while(messages.length<messageLength){
-					//メール受信完了まで待つ
-					try{
-						Thread.sleep(500);
-					}catch (Exception e) {}
-				}
 				if(StringUtils.isBlank(this.status.getLastSpMsgId())){
 					//IDが未設定の時
 					Message msg = messages[messageLength-1];
@@ -220,19 +215,31 @@ public class SpmodeCheckMail implements Runnable{
 						}
 					}
 					
+					/*
+					 * メールボックスが空なので次回からすべてのメールを再転送すればよいが、
+					 * 空になってから15分間はドコモメールサーバの異常を疑う
+					 * 15分間は thisId が設定されないため status.ini の更新も行われない
+					 */
+					if(messageLength == 0 && !lastId.equals(InitialId)){
+						if(initialCheckDate != null){
+							long diff = System.currentTimeMillis() - initialCheckDate.getTime();
+							if(diff > 15*60*1000){
+								initialCheckDate = null;
+								thisId = InitialId;
+							}
+						} else {
+							initialCheckDate = new Date();
+						}
+					}
+					
 					//該当するIDのメールが削除されていた場合、全再送を防ぐため上限数を設定する。上限数マイナスの場合は上限設定無効
 					int recievemax = this.unknownForwardLimit;
-					if (start < 0 && recievemax >= 0 && !lastId.equals(InitialId)){
+					if (messageLength > 0 && start < 0 && recievemax >= 0 && !lastId.equals(InitialId)){
 						log.warn("最後に取得したメールが発見できなかったため最新の" + recievemax + "通(spmode.unknownforwardlimit)を上限としてメール転送します");
 						start = messageLength - Math.min(messageLength,recievemax) - 1;
 						
 						//IDを最新メールに再設定する
-						if(messageLength>0){
-							thisId = messages[messageLength-1].getHeader("Message-ID")[0];
-						}else{
-							//メールボックスが空なので次回からすべてのメールを再転送する
-							thisId = InitialId;
-						}
+						thisId = messages[messageLength-1].getHeader("Message-ID")[0];
 					}
 					
 					//メールの取得と転送
