@@ -242,6 +242,15 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	}
 	
 	public void waitMessage() {
+		if (folderList.size()==0){
+			log.warn("読み取り対象のフォルダが存在しないためメールの監視を中止します");
+			// 安直に無限ループ待ち
+			while (true) {
+				try{
+					Thread.sleep(60*60*24*1000);
+				}catch (Exception e) {}
+			}
+		}
 		log.info("IMAP IDLE開始");
 		for (Folder folder : folderList) {
 			if (folder.isOpen()){
