@@ -53,13 +53,13 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	private Properties props;
 	private String myname;
 	private String passwd;
+	private Store store;
 	
 	private boolean doingImapIdle;
 	private List<Folder> folderList;
 	private TreeMap<String, Message> allMessages;
 	private TreeMap<String, Message> latestMessages;
 	private String lastPollUid;
-	private Store store;
 	
 	public SpmodeImapReader(ServerMain server){
 		this.conf = server.conf;
@@ -91,7 +91,6 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	public Store connect(Store str) throws MessagingException {
 		
 		Session session = null;
-		//Store store = null;
 		if(str==null || !str.isConnected()){
 			session = Session.getInstance(props, null);
 			session.setDebug(conf.isMailDebugEnable());

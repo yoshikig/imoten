@@ -28,6 +28,8 @@ import java.util.List;
 
 import javax.mail.Address;
 import javax.mail.BodyPart;
+import javax.mail.Flags;
+import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
@@ -45,6 +47,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.Email;
 import org.apache.commons.mail.EmailException;
 
+import com.sun.mail.imap.IMAPFolder;
+
 public class SpmodeSendMail extends MyHtmlEmail {
 	private static final Log log = LogFactory.getLog(SpmodeSendMail.class);
 	private MimeMessage smm;
@@ -58,6 +62,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	private boolean editDocomoSubjectPrefix;
 	private boolean ignoreMuaSettings;
 	private boolean sjisconvert = false;
+	private IMAPFolder sentFolder = null;
 
 	public SpmodeSendMail(MimeMessage sm, List<String> recipients, Config conf) throws EmailException{
 		String protocol = conf.getSpmodeProtocol();
@@ -407,6 +412,27 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		return super.setSubject(Util.reverseReplaceUnicodeMapping(subject));
 	}
 
+	@Override
+	public String send() throws EmailException {
+		String result = super.send();
+		if(sentFolder!=null){
+			Message msg = getMimeMessage();
+			try {
+				Message[] ma = { msg };
+				ma = sentFolder.addMessages(ma);
+				for (Message m : ma){
+					m.setFlag(Flags.Flag.SEEN, true);
+				}
+				sentFolder.close(false);
+				sentFolder = null;
+				log.info("IMAPサーバのSentフォルダへ送信メールを保存しました");
+			}catch(Exception e){
+				log.error("IMAPサーバのSentフォルダへの保存に失敗",e);
+			}
+		}
+		return result;
+	}
+
 	private void addSmmRecipientsList(List<String> addrsList) {
 		for (String addr : addrsList) {
 			try{
@@ -449,5 +475,9 @@ public class SpmodeSendMail extends MyHtmlEmail {
 
 	public static void setGoomojiSubjectCharConv(CharacterConverter goomojiSubjectCharConv) {
 		SpmodeSendMail.goomojiSubjectCharConv = goomojiSubjectCharConv;
+	}
+	
+	public void setImapSentFolder(Folder folder) {
+		this.sentFolder = (IMAPFolder)folder;
 	}
 }
