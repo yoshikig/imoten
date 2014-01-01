@@ -24,6 +24,7 @@ package immf;
 import immf.growl.GrowlNotifier;
 
 import javax.mail.AuthenticationFailedException;
+import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Store;
@@ -48,7 +49,6 @@ import org.apache.commons.mail.EmailException;
 public class SpmodeCheckMail implements Runnable {
 	private static final Log log = LogFactory.getLog(ServerMain.class);
 
-	private ServerMain server;
 	private Config conf;
 	private SkypeForwarder skypeForwarder;
 	private ImKayacNotifier imKayacNotifier;
@@ -63,11 +63,10 @@ public class SpmodeCheckMail implements Runnable {
 	private String csvAddressBook;
 	private String vcAddressBook;
 	private boolean forwardWithoutPush = false;
-	private String protocol;
 	private SpmodeReader sr;
+	private boolean hasImapSentFolder = false;
 
 	public SpmodeCheckMail(ServerMain server, String protocol){
-		this.server = server;
 		this.conf = server.conf;
 		this.skypeForwarder = server.skypeForwarder;
 		this.imKayacNotifier = server.imKayacNotifier;
@@ -79,7 +78,12 @@ public class SpmodeCheckMail implements Runnable {
 		this.ignoreDomainsMap = server.ignoreDomainsMap;
 		this.csvAddressBook = this.conf.getCsvAddressFile();
 		this.vcAddressBook = this.conf.getVcAddressFile();
-		this.protocol = protocol;
+		if(protocol.equalsIgnoreCase("imap")){
+			this.sr = new SpmodeImapReader(server);
+			this.hasImapSentFolder = true;
+		}else{
+			this.sr = new SpmodePop3Reader(server);
+		}
 		for (Map.Entry<Config, ForwardMailPicker> f : forwarders.entrySet()) {
 			Config forwardConf = f.getKey();
 			if(forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH){
@@ -89,12 +93,7 @@ public class SpmodeCheckMail implements Runnable {
 	}
 
 	public void run() {
-		if(protocol.equalsIgnoreCase("imap")){
-			sr = new SpmodeImapReader(server);
-		}else{
-			sr = new SpmodePop3Reader(server);
-		}
-
+		
 		// 読み込みは初回起動時のみ
 		this.loadAddressBook();
 
@@ -221,6 +220,14 @@ public class SpmodeCheckMail implements Runnable {
 			
 			// クローズ処理
 			sr.close();
+		}
+	}
+	
+	public Folder getSentFolder() {
+		if(hasImapSentFolder){
+			return ((SpmodeImapReader)sr).getSentFolder();
+		}else{
+			return null;
 		}
 	}
 	

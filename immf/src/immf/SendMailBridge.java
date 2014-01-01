@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.mail.BodyPart;
+import javax.mail.Folder;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
@@ -72,6 +73,8 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 	private boolean sendAsync;
 
 	private Map<String, List<String>>receivedMessageTable;
+
+	private SpmodeCheckMail imapchecker = null;
 
 	public SendMailBridge(Config conf, ImodeNetClient client, SendMailPicker picker, StatusManager status){
 		if(conf.getSenderSmtpPort()<=0){
@@ -173,6 +176,10 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 			}else{
 				log.info("spモード動作モード");
 				SpmodeSendMail spmodeSendMail = new SpmodeSendMail(mime,recipients,conf);
+				if (imapchecker != null) {
+					Folder sentFolder = imapchecker.getSentFolder();
+					spmodeSendMail.setImapSentFolder(sentFolder);
+				}
 				spmodeSendMail.send();
 				return;
 			}
@@ -287,6 +294,10 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 		}
 	}
 
+	// IMAPで送信メールを保存するための処理
+	public void setImapChecker(SpmodeCheckMail imapchecker){
+		this.imapchecker = imapchecker;
+	}
 	/*
 	 * マルチパートを処理
 	 */

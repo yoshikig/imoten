@@ -143,7 +143,7 @@ public class ServerMain {
 
 		// メール送信
 		spicker = new SendMailPicker(conf, this, this.client, this.status);
-		new SendMailBridge(conf, this.client, this.spicker, this.status);
+		SendMailBridge sendmail = new SendMailBridge(conf, this.client, this.spicker, this.status);
 
 		// メール転送
 		Config forwardConf = this.conf;
@@ -230,6 +230,7 @@ public class ServerMain {
 					ts.setName("SpmodeChecker[imap]");
 					ts.setDaemon(true);
 					ts.start();
+					sendmail.setImapChecker(spmodeChecker);
 				}
 			}
 		}

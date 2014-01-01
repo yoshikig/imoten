@@ -59,6 +59,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	private TreeMap<String, Message> allMessages;
 	private TreeMap<String, Message> latestMessages;
 	private String lastPollUid;
+	private Store store;
 	
 	public SpmodeImapReader(ServerMain server){
 		this.conf = server.conf;
@@ -90,7 +91,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	public Store connect(Store str) throws MessagingException {
 		
 		Session session = null;
-		Store store = null;
+		//Store store = null;
 		if(str==null || !str.isConnected()){
 			session = Session.getInstance(props, null);
 			session.setDebug(conf.isMailDebugEnable());
@@ -136,6 +137,17 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		return store;
 	}
 
+	public Folder getSentFolder() {
+		try{
+			Folder rootFolder = store.getDefaultFolder();
+			Folder sentFolder = rootFolder.getFolder("Sent");
+			sentFolder.open(Folder.READ_WRITE);
+			return sentFolder;
+		} catch (MessagingException me){
+			return null;
+		}
+	}
+	
 	public void getMessages() throws MessagingException {
 		String lastId = getLastId();
 		folderLoop:
@@ -150,7 +162,6 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 				if(index == messageLength-1){
 					latestMessages.put(thisId, msg);
 					if(StringUtils.isBlank(lastId)){
-						log.info("lastId="+lastId);
 						continue folderLoop;
 					}
 				}
