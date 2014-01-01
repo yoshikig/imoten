@@ -215,11 +215,19 @@ public class ServerMain {
 			// spモードメール着信監視
 			if(this.conf.isSpmodeEnable()){
 				String protocol = conf.getSpmodeProtocol();
-				if((protocol.equalsIgnoreCase("pop3")&&this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null)
-						|| this.conf.getSpmodeMailUser()!=null){
-					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this);
+				if(!protocol.equalsIgnoreCase("imap")
+						&&this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
+					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this, "pop3");
 					Thread ts = new Thread(spmodeChecker);
-					ts.setName("SpmodeChecker");
+					ts.setName("SpmodeChecker[pop3]");
+					ts.setDaemon(true);
+					ts.start();
+				}
+				if(!protocol.equalsIgnoreCase("pop3")
+						&&this.conf.getSpmodeMailUser()!=null&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
+					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this, "imap");
+					Thread ts = new Thread(spmodeChecker);
+					ts.setName("SpmodeChecker[imap]");
 					ts.setDaemon(true);
 					ts.start();
 				}

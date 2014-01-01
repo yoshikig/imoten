@@ -55,7 +55,8 @@ public class Config {
 	// spモード関連その他パラメータ
 	private List<String> spmodeSjisCharConvertFile = new ArrayList<String>();
 	private int spmodeUnknownForwardLimit = 10;
-	private boolean spmodeLeaveSeenFlag = false;
+	private boolean spmodeForceSeen = false;
+	private List<String> spmodeImapSystemFolders = new ArrayList<String>();
 
 	// imode.net、spモード有効無効スイッチ
 	private boolean imodenetEnable = true;
@@ -322,13 +323,18 @@ public class Config {
 		this.spmodeMailAddr =	getString("spmode.mail", null);
 		this.spmodeMailPasswd = getString("spmode.passwd", null);
 		if(!getString("spmode.protocol", this.spmodeProtocol).equalsIgnoreCase("imap")){
+			if(getString("spmode.protocol", "").equalsIgnoreCase("both")){
+				this.spmodeProtocol = "both";
+			}else{
 				this.spmodeProtocol = "pop3";
+			}
 		}
 		this.spmodeReadonly =	getBoolean("_spmode.mbox.readonly", this.spmodeReadonly);
 		this.spmodeSjisCharConvertFile =
 			splitComma(getString("_spmode.mbox.sjisconvfile", "../conv/unicode2docomo.csv,../conv/genSb2docomo.csv"));
 		this.spmodeUnknownForwardLimit =	getInt("spmode.unknownforwardlimit", this.spmodeUnknownForwardLimit);
-		this.spmodeLeaveSeenFlag =	getBoolean("spmode.forceseen", this.spmodeLeaveSeenFlag);
+		this.spmodeForceSeen =	getBoolean("spmode.forceseen", this.spmodeForceSeen);
+		this.spmodeImapSystemFolders = splitComma(getString("spmode.systemfolder", ""));
 		this.smtpServer = 		getString("smtp.server", null);
 		this.smtpPort = 		getInt(   "smtp.port", this.smtpPort);
 		this.smtpConnectTimeoutSec = getInt("smtp.connecttimeout", this.smtpConnectTimeoutSec);
@@ -647,8 +653,12 @@ public class Config {
 		return spmodeUnknownForwardLimit;
 	}
 
-	public boolean getSpmodeLeaveSeenFlag() {
-		return spmodeLeaveSeenFlag;
+	public boolean isSpmodeForceSeen() {
+		return spmodeForceSeen;
+	}
+
+	public List<String> getSpmodeImapSystemFolders() {
+		return spmodeImapSystemFolders;
 	}
 
 	public String getGmailId() {

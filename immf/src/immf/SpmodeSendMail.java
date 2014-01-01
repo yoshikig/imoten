@@ -74,14 +74,16 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		this.setDebug(conf.isMailDebugEnable());
 
 		// SMTP Server
-		if(protocol.equalsIgnoreCase("pop3")){
-			this.setHostName("mail.spmode.ne.jp");
-			myname = conf.getSpmodeMailUser();
-			passwd = conf.getSpmodeMailPasswd();
-		}else{
+		if(!protocol.equalsIgnoreCase("pop3")){
+			// imap
 			this.setHostName("smtp.spmode.ne.jp");
 			myname = conf.getDocomoId();
 			passwd = conf.getDocomoPasswd();
+		}else{
+			// pop3
+			this.setHostName("mail.spmode.ne.jp");
+			myname = conf.getSpmodeMailUser();
+			passwd = conf.getSpmodeMailPasswd();
 		}
 		this.setSmtpPort(465);
 		this.setSocketConnectionTimeout(conf.getSmtpConnectTimeoutSec()*1000);
