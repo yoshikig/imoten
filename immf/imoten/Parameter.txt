@@ -605,6 +605,7 @@ spmode.checkinterval
 　デフォルト[900](15分)。
 
 spmode.unknownforwardlimit
+　spmode.protocol=pop3の時にのみ有効なパラメータです。
 　imotenによって転送済みの最新のメールを標準のメーラーによって削除した場合、
 　imotenはどのメールが転送済みか分からなくなりメールボックスにある全てのメールを新着とみなして
 　再度転送する処理を行います。迷惑メールなど大量のメールが溜まっていると再転送されるメールも大量になるため
@@ -646,12 +647,19 @@ spmode.unknownforwardlimit
 　このパラメーターを設定するよりは、そういう使い方をされた方が煩わされなくてすみます。
 
 spmode.forceseen
+　spmode.protocol=imapの時にのみ有効なパラメータです。
 　trueを設定するとimotenで転送したメールをドコモメールサーバ上で開封済みにします。
 　spmode.protocol=imapでない場合は設定しても無視されます。
 　デフォルト[false]
-　※実際の動作としてはIMAPでメールを読み出すとそのメールが開封済みに変わってしまうため
-　　imotenは転送済みのメールの状態を未読に戻す処理をしています。
-　　true設定時は単にこの未読に戻す動作がキャンセルされるのみです。
+
+spmode.systemfolder
+　spmode.protocol=imapの時にのみ有効なパラメータです。
+　ドコモメールのシステムフォルダをカンマ区切りで指定します。ここに指定したフォルダは
+　転送対象外と扱われます。自分でドコモメールに作成したフォルダを転送対象外にしたい場合は
+　このパラメータで設定できます。
+　設定する場合はデフォルト値に追加したいフォルダを追記して設定してください。
+　設定例：spmode.systemfolder=Sent,Drafts,Trash,任意のフォルダ
+　デフォルト[Sent,Drafts,Trash]
 
 forward.only
 　[forward.]からはじまる各転送先設定をiモードメールを受信した場合のみ転送するのか、
