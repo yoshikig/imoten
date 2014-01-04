@@ -75,7 +75,7 @@ public class SpmodePop3Reader extends SpmodeReader{
 		this.unknownForwardLimit = this.conf.getSpmodeUnknownForwardLimit();
 	}
 	
-	public Store connect(Store str) throws MessagingException {
+	public Store connect(Store str, boolean readSent) throws MessagingException {
 		
 		Session session = null;
 		Store store = null;

@@ -73,6 +73,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private List<InternetAddress> smmCcAddrList = new ArrayList<InternetAddress>();
 	private boolean decomeFlg = false;
 	private boolean hasPlain = false;
+	private boolean isSent = false;
 	private Config conf;
 	private CharacterConverter subjectCharConv = null;
 	private CharacterConverter goomojiSubjectCharConv = null;
@@ -176,6 +177,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 
 		try{
 			// ヘッダを取得
+			if(smm.getHeader(SpmodeImapReader.sentHeader)!=null){
+				isSent = true;
+			}
 			
 			// Subject:
 			smmSubject = smm.getSubject();
@@ -196,16 +200,18 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			smmFromAddr = this.addressBook.getInternetAddress((InternetAddress) smm.getFrom()[0],this.mailAddrCharset);
 			headerInfo.append(" From:    ").append(smmFromAddr.toUnicodeString()).append("\r\n");
 			// ReplyTo:
-			Address[] addrsReplyTo = smm.getReplyTo();
-			if (addrsReplyTo != null){
-				for (int i = 0; i < addrsReplyTo.length; i++) {
-					smmReplyToAddrList.add(this.addressBook.getInternetAddress((InternetAddress) addrsReplyTo[i],this.mailAddrCharset));
+			if(smm.getHeader("Reply-To")!=null){
+				for (String addr : smm.getHeader("Reply-To")){
+					smmReplyToAddrList.add(this.addressBook.getInternetAddress(addr,this.mailAddrCharset));
 				}
 			}
 			// To:
 			Address[] addrsTo = smm.getRecipients(Message.RecipientType.TO);
 			String label = " To:";
 			boolean bccLabel = true;
+			if(isSent){
+				bccLabel = false;
+			}
 			if (addrsTo != null){
 				for (int i = 0; i < addrsTo.length; i++) {
 					InternetAddress addr = this.addressBook.getInternetAddress((InternetAddress) addrsTo[i],this.mailAddrCharset);
@@ -246,7 +252,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}else{
 				headerInfo.append(" Subject: ").append(smmSubject).append("\r\n");
 			}
-			if(conf.getConfigId() == 1){
+			if(isSent){
+				log.info("spモードメール(送信BOX)を転送\n"+headerInfo);
+			}else if(conf.getConfigId() == 1){
 				log.info("spモードメールを転送\n"+headerInfo);
 			}
 
@@ -839,7 +847,11 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}
 
 			String subject = null;
-			subject = conf.getSubjectAppendPrefix()+smmSubject+conf.getSubjectAppendSuffix();
+			if(isSent){
+				subject = conf.getSentSubjectAppendPrefix()+smmSubject+conf.getSentSubjectAppendSuffix();
+			}else{
+				subject = conf.getSubjectAppendPrefix()+smmSubject+conf.getSubjectAppendSuffix();
+			}
 			if(conf.isSubjectEmojiReplace()){
 				subject = EmojiUtil.replaceToLabel(subject);
 			}

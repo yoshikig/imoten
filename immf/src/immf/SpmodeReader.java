@@ -26,7 +26,7 @@ import javax.mail.MessagingException;
 import javax.mail.Store;
 
 public abstract class SpmodeReader{
-	public abstract Store connect(Store str) throws MessagingException;
+	public abstract Store connect(Store str, boolean readSent) throws MessagingException;
 	public abstract void getMessages() throws MessagingException;
 	public abstract int getMessageCount();
 	public abstract Message readMessage();

@@ -24,13 +24,16 @@ package immf;
 import javax.mail.Flags;
 import javax.mail.Folder;
 import javax.mail.FolderClosedException;
+import javax.mail.Header;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Session;
 import javax.mail.Store;
+import javax.mail.internet.MimeMessage;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +47,10 @@ import org.apache.commons.logging.LogFactory;
 import com.sun.mail.imap.IMAPFolder;
 
 public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionHandler{
+	public static final String sentHeader = "X-IMOTEN-FOLDER-SENT";
 	private static final Log log = LogFactory.getLog(ServerMain.class);
-	private final String[] systemFolders = { "Sent", "Drafts", "Trash" };
+	private final String sentFolder = "Sent";
+	private final String[] systemFolders = { sentFolder, "Drafts", "Trash" };
 
 	private Config conf;
 	private StatusManager status;
@@ -88,7 +93,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 
 	}
 	
-	public Store connect(Store str) throws MessagingException {
+	public Store connect(Store str, boolean readSent) throws MessagingException {
 		
 		Session session = null;
 		if(str==null || !str.isConnected()){
@@ -113,6 +118,10 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 			for (String s : systemFolders) {
 				ignoreFolders.add(s);
 			}
+		}
+		// ここ(readSent)だけ座りが悪い
+		if(readSent){
+			ignoreFolders.remove(sentFolder);
 		}
 		for (Folder f : subscribedFolders) {
 			String folderName = f.getFullName();
@@ -139,9 +148,9 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	public Folder getSentFolder() {
 		try{
 			Folder rootFolder = store.getDefaultFolder();
-			Folder sentFolder = rootFolder.getFolder("Sent");
-			sentFolder.open(Folder.READ_WRITE);
-			return sentFolder;
+			Folder folder = rootFolder.getFolder(sentFolder);
+			folder.open(Folder.READ_WRITE);
+			return folder;
 		} catch (MessagingException me){
 			return null;
 		}
@@ -149,8 +158,15 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	
 	public void getMessages() throws MessagingException {
 		String lastId = getLastId();
+		boolean isSent;
 		folderLoop:
 		for (Folder folder : folderList) {
+			if(folder.getFullName().equalsIgnoreCase(sentFolder)){
+				isSent = true;
+			}else{
+				isSent = false;
+			}
+			
 			Message messages[] = folder.getMessages();
 			int messageLength = folder.getMessageCount();
 			int start = -1;
@@ -175,15 +191,34 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 			for (int index = start + 1; index < messageLength; index++) {
 				msg = messages[index];
 				boolean seen = msg.isSet(Flags.Flag.SEEN);
-				String id = "";
+				String id = getUid(folder, msg);
 				try {
+					StringBuilder maildata = new StringBuilder();
+					@SuppressWarnings("unchecked")
+					Enumeration<Header> e = msg.getAllHeaders();
+					while (e.hasMoreElements()) {
+				    	Header h = e.nextElement();
+				    	maildata.append(h.getName()).append(": ").append(h.getValue()).append("\n");
+				    }
+					maildata.append("\n");
 					byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
-					log.info("Content-Type:"+msg.getContentType());
-					log.info("Content[\n"+new String(contentData)+"\n]");
+					maildata.append(new String(contentData)).append("\n");
+					log.info("取得メール情報:"+id+"\n"+maildata);
 				}catch(Exception e){}
 
-				id = getUid(folder, msg);
-				allMessages.put(id, msg);
+				if(isSent){
+					/*
+					 * X-IMOTEN-FOLDER-SENT 以下の判定で使用
+					 * forward.sent
+					 * forward.sent.subject.prefix
+					 * forward.sent.subject.suffix
+					 */
+					Message sentMsg = new MimeMessage((MimeMessage)msg);
+					sentMsg.addHeader(sentHeader, "true");
+					allMessages.put(id, sentMsg);
+				}else{
+					allMessages.put(id, msg);
+				}
 
 				// 既読フラグのセット
 				if(folder.getMode()!=Folder.READ_WRITE){

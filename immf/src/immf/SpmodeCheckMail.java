@@ -63,6 +63,7 @@ public class SpmodeCheckMail implements Runnable {
 	private String csvAddressBook;
 	private String vcAddressBook;
 	private boolean forwardWithoutPush = false;
+	private boolean forwardSent = false;
 	private SpmodeReader sr;
 	private boolean hasImapSentFolder = false;
 
@@ -88,6 +89,9 @@ public class SpmodeCheckMail implements Runnable {
 			Config forwardConf = f.getKey();
 			if(forwardConf.getForwardOnly()==Config.ForwardOnly.PUSH){
 				this.forwardWithoutPush = true;
+			}
+			if(forwardConf.isForwardSent()){
+				this.forwardSent = true;
 			}
 		}
 	}
@@ -115,7 +119,7 @@ public class SpmodeCheckMail implements Runnable {
 			}
 
 			try{
-				store = sr.connect(store);
+				store = sr.connect(store, this.forwardSent);
 				
 				//メールの取得
 				sr.getMessages();
@@ -249,6 +253,13 @@ public class SpmodeCheckMail implements Runnable {
 				Config forwardConf = f.getKey();
 				int id = forwardConf.getConfigId();
 
+				if(hasImapSentFolder && forwardSent){
+					if(!forwardConf.isForwardSent() && msg.getHeader(SpmodeImapReader.sentHeader)!=null){
+						// 送信メールは転送しない
+						continue;
+					}
+				}
+				
 				if(forwardConf.getForwardOnly()==Config.ForwardOnly.Imode){
 					continue;
 				}
