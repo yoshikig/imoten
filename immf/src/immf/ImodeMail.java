@@ -31,11 +31,13 @@ import javax.mail.BodyPart;
 import javax.mail.Message;
 import javax.mail.Session;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeMultipart;
 import javax.mail.internet.MimeUtility;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.text.StrBuilder;
 import org.apache.commons.logging.Log;
@@ -277,19 +279,26 @@ public class ImodeMail {
 			// ボディ
 			if (attachFileList.size()==0 && inlineFileList.size()==0){
 				if (decomeFlg){
-					m.setText(body, "Shift_JIS", "html");
+					m.setText(text, "Shift_JIS", "html");
+					m.setHeader("Content-Type", "text/html; charset=Shift_JIS");
 				}else{
-					m.setText(body, "Shift_JIS");
+					m.setText(text, "Shift_JIS");
+					m.setHeader("Content-Type", "text/plain; charset=Shift_JIS");
 				}
+				m.setHeader("Content-Transfer-Encoding", "8bit");
+				
 			} else {
 				MimeMultipart rootPart = new MimeMultipart("mixed");
 				m.setContent(rootPart);
+				m.addHeader("Content-Type", rootPart.getContentType());
 				
 				MimeBodyPart textPart = new MimeBodyPart();
 				if (decomeFlg){
-					textPart.setText(body, "Shift_JIS", "html");
+					textPart.setText(text, "Shift_JIS", "html");
+					textPart.setHeader("Content-Type", "text/html; charset=Shift_JIS");
 				}else{
-					textPart.setText(body, "Shift_JIS");
+					textPart.setText(text, "Shift_JIS");
+					textPart.setHeader("Content-Type", "text/plain; charset=Shift_JIS");
 				}
 				textPart.setHeader("Content-Transfer-Encoding", "base64");
 
@@ -297,21 +306,20 @@ public class ImodeMail {
 					MimeMultipart relatedMultipart = new MimeMultipart("related");
 					MimeBodyPart relatedBodyPart = new MimeBodyPart();
 					relatedBodyPart.setContent(relatedMultipart);
+					relatedBodyPart.addHeader("Content-Type", relatedMultipart.getContentType());
 					rootPart.addBodyPart(relatedBodyPart);
-
-					MimeMultipart altMultipart = new MimeMultipart("alternative");
-					MimeBodyPart altBodyPart = new MimeBodyPart();
-					altBodyPart.setContent(altMultipart);
-					relatedMultipart.addBodyPart(altBodyPart);
 
 					relatedMultipart.addBodyPart(textPart);
 
 					for (AttachedFile f : inlineFileList) {
-						MimeBodyPart thisPart = new MimeBodyPart();
-						thisPart.setDataHandler(new DataHandler(new ByteArrayDataSource(f.getData(),f.getContentType())));
-						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
+						
+						InternetHeaders thisPartHeader = new InternetHeaders();
+						thisPartHeader.setHeader("Content-Type", f.getContentType());
+						thisPartHeader.setHeader("Content-Transfer-Encoding", "base64");
+						MimeBodyPart thisPart = new MimeBodyPart(thisPartHeader, f.getBase64Data());
+						
 						thisPart.setDisposition(BodyPart.INLINE);
-						thisPart.setContentID(f.getId());
+						thisPart.setContentID("<"+f.getId()+">");
 						relatedMultipart.addBodyPart(thisPart);
 					}
 				} else {
@@ -320,8 +328,11 @@ public class ImodeMail {
 				
 				if (attachFileList.size()>0) {
 					for (AttachedFile f : attachFileList) {
-						MimeBodyPart thisPart = new MimeBodyPart();
-						thisPart.setDataHandler(new DataHandler(new ByteArrayDataSource(f.getData(),f.getContentType())));
+						InternetHeaders thisPartHeader = new InternetHeaders();
+						thisPartHeader.setHeader("Content-Type", f.getContentType());
+						thisPartHeader.setHeader("Content-Transfer-Encoding", "base64");
+						MimeBodyPart thisPart = new MimeBodyPart(thisPartHeader, f.getBase64Data());
+
 						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
 						thisPart.setDisposition(BodyPart.ATTACHMENT);
 						rootPart.addBodyPart(thisPart);

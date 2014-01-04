@@ -21,6 +21,8 @@
 
 package immf;
 
+import org.apache.commons.codec.binary.Base64;
+
 public class AttachedFile {
 	private String contentType;
 	private byte[] data;
@@ -45,6 +47,9 @@ public class AttachedFile {
 	}
 	public byte[] getData() {
 		return data;
+	}
+	public byte[] getBase64Data() {
+		return Base64.encodeBase64(data);
 	}
 	public void setData(byte[] data) {
 		this.data = data;
