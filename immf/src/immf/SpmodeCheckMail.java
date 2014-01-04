@@ -24,7 +24,6 @@ package immf;
 import immf.growl.GrowlNotifier;
 
 import javax.mail.AuthenticationFailedException;
-import javax.mail.Folder;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Store;
@@ -37,7 +36,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.IllegalStateException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +43,8 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.EmailException;
+
+import com.sun.mail.imap.IMAPFolder;
 
 public class SpmodeCheckMail implements Runnable {
 	private static final Log log = LogFactory.getLog(ServerMain.class);
@@ -65,7 +65,7 @@ public class SpmodeCheckMail implements Runnable {
 	private boolean forwardWithoutPush = false;
 	private boolean forwardSent = false;
 	private SpmodeReader sr;
-	private boolean hasImapSentFolder = false;
+	private boolean hasImapFolder = false;
 
 	public SpmodeCheckMail(ServerMain server, String protocol){
 		this.conf = server.conf;
@@ -81,7 +81,7 @@ public class SpmodeCheckMail implements Runnable {
 		this.vcAddressBook = this.conf.getVcAddressFile();
 		if(protocol.equalsIgnoreCase("imap")){
 			this.sr = new SpmodeImapReader(server);
-			this.hasImapSentFolder = true;
+			this.hasImapFolder = true;
 		}else{
 			this.sr = new SpmodePop3Reader(server);
 		}
@@ -226,15 +226,32 @@ public class SpmodeCheckMail implements Runnable {
 			sr.close();
 		}
 	}
-	
-	public Folder getSentFolder() {
-		if(hasImapSentFolder){
+
+	/*
+	 * 他のクラスとIMAPとの仲立ち
+	 */
+	public IMAPFolder getSentFolder() {
+		if(hasImapFolder){
 			return ((SpmodeImapReader)sr).getSentFolder();
 		}else{
 			return null;
 		}
 	}
-	
+
+	public SpmodeImapReader getImapReader(){
+		if(hasImapFolder){
+			return (SpmodeImapReader)sr;
+		}else{
+			return null;
+		}
+	}
+
+	public void setImapReader(SpmodeImapReader imapreader){
+		if(!hasImapFolder){
+			((SpmodePop3Reader)sr).setImapReader(imapreader);
+		}
+	}
+
 	/*
 	 * メールをダウンロードして送信
 	 */
@@ -253,7 +270,7 @@ public class SpmodeCheckMail implements Runnable {
 				Config forwardConf = f.getKey();
 				int id = forwardConf.getConfigId();
 
-				if(hasImapSentFolder && forwardSent){
+				if(hasImapFolder && forwardSent){
 					if(!forwardConf.isForwardSent() && msg.getHeader(SpmodeImapReader.sentHeader)!=null){
 						// 送信メールは転送しない
 						continue;

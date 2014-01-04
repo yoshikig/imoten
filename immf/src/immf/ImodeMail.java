@@ -24,12 +24,23 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Properties;
 
+import javax.activation.DataHandler;
+import javax.mail.BodyPart;
+import javax.mail.Message;
+import javax.mail.Session;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
+import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
+import javax.mail.internet.MimeUtility;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.text.StrBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.mail.ByteArrayDataSource;
 
 public class ImodeMail {
 	private static final Log log = LogFactory.getLog(ImodeMail.class);
@@ -227,5 +238,105 @@ public class ImodeMail {
 
 	public List<String> getGroupList() {
 		return groupList;
+	}
+
+	public Message getMessage() {
+		Session session = Session.getInstance(new Properties());
+		MimeMessage m = new MimeMessage(session);
+		String text = body;
+		
+		
+		if (decomeFlg) {
+			for (AttachedFile f : inlineFileList) {
+				text = StringUtils.replace(text, f.getId(), "cid:"+f.getId());
+			}
+		}
+		
+		try{
+			// ヘッダ
+			m.setFrom(fromAddr);
+			switch(recvType){
+			case RECV_TYPE_TO:
+				m.addRecipients(Message.RecipientType.TO, getMyMailAddr());
+				break;
+			case RECV_TYPE_CC:
+				m.addRecipients(Message.RecipientType.CC, getMyMailAddr());
+				break;
+			case RECV_TYPE_BCC:
+				break;
+			}
+			for (InternetAddress addr : toAddrList){
+				m.addRecipients(Message.RecipientType.TO, addr.getAddress());
+			}
+			for (InternetAddress addr : ccAddrList){
+				m.addRecipients(Message.RecipientType.CC, addr.getAddress());
+			}
+			m.setSubject(MimeUtility.encodeText(subject, "Shift_JIS", "B"));
+			m.setSentDate(getTimeDate());
+
+			// ボディ
+			if (attachFileList.size()==0 && inlineFileList.size()==0){
+				if (decomeFlg){
+					m.setText(body, "Shift_JIS", "html");
+				}else{
+					m.setText(body, "Shift_JIS");
+				}
+			} else {
+				MimeMultipart rootPart = new MimeMultipart("mixed");
+				m.setContent(rootPart);
+				
+				MimeBodyPart textPart = new MimeBodyPart();
+				if (decomeFlg){
+					textPart.setText(body, "Shift_JIS", "html");
+				}else{
+					textPart.setText(body, "Shift_JIS");
+				}
+				textPart.setHeader("Content-Transfer-Encoding", "base64");
+
+				if (inlineFileList.size()>0){
+					MimeMultipart relatedMultipart = new MimeMultipart("related");
+					MimeBodyPart relatedBodyPart = new MimeBodyPart();
+					relatedBodyPart.setContent(relatedMultipart);
+					rootPart.addBodyPart(relatedBodyPart);
+
+					MimeMultipart altMultipart = new MimeMultipart("alternative");
+					MimeBodyPart altBodyPart = new MimeBodyPart();
+					altBodyPart.setContent(altMultipart);
+					relatedMultipart.addBodyPart(altBodyPart);
+
+					relatedMultipart.addBodyPart(textPart);
+
+					for (AttachedFile f : inlineFileList) {
+						MimeBodyPart thisPart = new MimeBodyPart();
+						thisPart.setDataHandler(new DataHandler(new ByteArrayDataSource(f.getData(),f.getContentType())));
+						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
+						thisPart.setDisposition(BodyPart.INLINE);
+						thisPart.setContentID(f.getId());
+						relatedMultipart.addBodyPart(thisPart);
+					}
+				} else {
+					rootPart.addBodyPart(textPart);
+				}
+				
+				if (attachFileList.size()>0) {
+					for (AttachedFile f : attachFileList) {
+						MimeBodyPart thisPart = new MimeBodyPart();
+						thisPart.setDataHandler(new DataHandler(new ByteArrayDataSource(f.getData(),f.getContentType())));
+						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
+						thisPart.setDisposition(BodyPart.ATTACHMENT);
+						rootPart.addBodyPart(thisPart);
+					}
+				}
+			}
+			
+		}catch (Exception e){
+			log.error("Message作成中のエラー",e);
+			m = null;
+		}
+		
+		//StringBuilder maildata = Util.dumpMessage(m);
+		//log.info("作成メール情報\n"+maildata);
+
+		return m;
 	}
 }

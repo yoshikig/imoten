@@ -42,6 +42,7 @@ import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
 import javax.mail.Session;
+import javax.mail.internet.ContentType;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
@@ -87,6 +88,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 	private Map<URL, String> emojiToCode = new HashMap<URL, String>();
 	private MimeMultipart rootMultipart = null;
 	private List<BodyPart> attachedParts = new ArrayList<BodyPart>();
+	private boolean doDocomoCharConv = false;
 	private static CharacterConverter docomoCharConv = null;
 
 	private AddressBook addressBook;
@@ -108,7 +110,11 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		 *  subject … emojireplace.subject=true または forward.subject.charconvfile=設定なし
 		 *  body … emojireplace.body=noneではない
 		 * 
-		 * docomoCharConvSubjectはsubjectの変換を行うかどうかの判定フラグ
+		 * spモードメール(pop3)とimap2.spmode.ne.jpはUnicode6.0絵文字に変換されるが、
+		 * imap.spmode.ne.jpはドコモ側での変換はされずにSJIS、UTF-8混在でメールが届く。
+		 * 本処理はメールのcharsetがUTF-8の時のみ実行する。(doDocomoCharConv)
+		 * 
+		 * さらに、docomoCharConvSubjectはsubjectの変換を行うかどうかの判定フラグ
 		 */
 		boolean docomoCharConvSubject = false;
 		
@@ -186,9 +192,6 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			if (smmSubject==null){
 				smmSubject = "";
 			}
-			if(docomoCharConvSubject){
-				smmSubject = SpmodeForwardMail.docomoCharConv.convert(smmSubject);
-			}
 			// Date:
 			try{
 				smmDate = smm.getSentDate();
@@ -237,25 +240,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 					}
 				}
 			}
-			// その他ヘッダ情報
+			// Bcc:
 			if(bccLabel){
 				headerInfo.append(" Bcc:     ").append(conf.getSpmodeMailAddr()).append("\r\n");
-			}
-			SimpleDateFormat df = new SimpleDateFormat("yyyy/MM/dd (EEE) HH:mm:ss");
-			if(smmDate!=null){
-				headerInfo.append(" Date:    ").append(df.format(smmDate)).append("\r\n");
-			}else{
-				headerInfo.append(" Date:    (取得エラー)\r\n");
-			}
-			if(conf.isSubjectEmojiReplace()){
-				headerInfo.append(" Subject: ").append(EmojiUtil.replaceToLabel(smmSubject)).append("\r\n");
-			}else{
-				headerInfo.append(" Subject: ").append(smmSubject).append("\r\n");
-			}
-			if(isSent){
-				log.info("spモードメール(送信BOX)を転送\n"+headerInfo);
-			}else if(conf.getConfigId() == 1){
-				log.info("spモードメールを転送\n"+headerInfo);
 			}
 
 			// テキストパートを取得
@@ -264,6 +251,29 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			log.error(e);
 		}
 
+		// UTF-8 で届いたメッセージのUnicode絵文字からドコモ絵文字への変換
+		if(this.doDocomoCharConv && docomoCharConvSubject){
+			smmSubject = SpmodeForwardMail.docomoCharConv.convert(smmSubject);
+		}
+
+		// その他ヘッダ情報
+		SimpleDateFormat df = new SimpleDateFormat("yyyy/MM/dd (EEE) HH:mm:ss");
+		if(smmDate!=null){
+			headerInfo.append(" Date:    ").append(df.format(smmDate)).append("\r\n");
+		}else{
+			headerInfo.append(" Date:    (取得エラー)\r\n");
+		}
+		if(conf.isSubjectEmojiReplace()){
+			headerInfo.append(" Subject: ").append(EmojiUtil.replaceToLabel(smmSubject)).append("\r\n");
+		}else{
+			headerInfo.append(" Subject: ").append(smmSubject).append("\r\n");
+		}
+		if(isSent){
+			log.info("spモードメール(送信BOX)を転送\n"+headerInfo);
+		}else if(conf.getConfigId() == 1){
+			log.info("spモードメールを転送\n"+headerInfo);
+		}
+		
 		// 未使用。本文末尾にメッセージを追加する際に使用。parseTextPart()内でoptionPlainMsgの設定を想定
 		this.plainBody += this.optionPlainMsg;
 		this.htmlBody += this.optionHtmlMsg;
@@ -272,8 +282,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		this.plainBody = this.strConv.convert(this.plainBody);
 		this.htmlBody = this.strConv.convert(this.htmlBody);
 
+		// UTF-8 で届いたメッセージのUnicode絵文字からドコモ絵文字への変換
 		Config.BodyEmojiReplace emojiReplace = conf.getBodyEmojiReplace();
-		if(emojiReplace!=Config.BodyEmojiReplace.DontReplace){
+		if(this.doDocomoCharConv && emojiReplace!=Config.BodyEmojiReplace.DontReplace){
 			this.plainBody = SpmodeForwardMail.docomoCharConv.convert(this.plainBody);
 			this.htmlBody = SpmodeForwardMail.docomoCharConv.convert(this.htmlBody);
 		}
@@ -341,6 +352,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			try {
 				this.plainBody = p.getContent().toString();
 				this.keyPlainBody = this.plainBody;
+				String charset = (new ContentType(p.getContentType().toLowerCase())).getParameter("charset");
+				if(charset.equals("utf-8")){
+					this.doDocomoCharConv = true;
+				}
 			} catch (IOException io) {
 				this.plainBody = "";
 			}
@@ -349,6 +364,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			try {
 				this.htmlBody = p.getContent().toString();
 				this.keyHtmlBody = this.htmlBody;
+				String charset = (new ContentType(p.getContentType().toLowerCase())).getParameter("charset");
+				if(charset.equals("utf-8")){
+					this.doDocomoCharConv = true;
+				}
 			} catch (IOException IO) {
 				this.htmlBody = "";
 			}

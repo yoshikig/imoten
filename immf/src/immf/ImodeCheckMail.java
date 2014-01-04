@@ -49,6 +49,9 @@ public class ImodeCheckMail implements Runnable{
 	private int numForwardSite;
 	private Map<Config, ForwardMailPicker> forwarders = new HashMap<Config, ForwardMailPicker>();
 	private Map<Config, List<String>> ignoreDomainsMap = new HashMap<Config, List<String>>();
+	private SpmodeImapReader imapreader = null;
+	private boolean syncImapFolder = false;
+	private boolean syncImapOnly = false;
 
 	public ImodeCheckMail(ServerMain server){
 		this.client = server.client;
@@ -62,6 +65,8 @@ public class ImodeCheckMail implements Runnable{
 		this.numForwardSite = conf.countForwardSite();
 		this.forwarders = server.forwarders;
 		this.ignoreDomainsMap = server.ignoreDomainsMap;
+		this.syncImapFolder = this.conf.isImodenetSyncImap();
+		this.syncImapOnly = this.conf.isImodenetSyncOnly();
 	}
 
 	public void run() {
@@ -129,6 +134,13 @@ public class ImodeCheckMail implements Runnable{
 						newestId = newestInFolder;
 					}
 				}
+			}
+			
+			// IMAP同期
+			try {
+				imapreader.saveImodeMail();
+			}catch (Exception e1){
+				log.error("IMAP同期処理でエラー発生",e1);
 			}
 
 			// 接続フラグのリセット
@@ -213,6 +225,17 @@ public class ImodeCheckMail implements Runnable{
 				log.info("Downloaded Mail ########");
 				log.info(mail.toLoggingString());
 				log.info("########################");
+			}
+			// IMAP同期
+			if(this.syncImapFolder){
+				try{
+					imapreader.putImodeMail(mail);
+				} catch (Exception e1){
+					log.error("IMAP同期処理でエラー発生",e1);
+				}
+				if(this.syncImapOnly){
+					return;
+				}
 			}
 		}catch (Exception e) {
 			log.warn("i mode.net mailId["+mailId+"] download Error.",e);
@@ -318,5 +341,9 @@ public class ImodeCheckMail implements Runnable{
 			// 負荷をかけないように
 			Thread.sleep(1000);
 		}catch (Exception e) {}
+	}
+
+	public void setImapReader(SpmodeImapReader imapreader){
+		this.imapreader = imapreader;
 	}
 }

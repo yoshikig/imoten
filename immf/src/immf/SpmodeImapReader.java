@@ -24,7 +24,6 @@ package immf;
 import javax.mail.Flags;
 import javax.mail.Folder;
 import javax.mail.FolderClosedException;
-import javax.mail.Header;
 import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Session;
@@ -33,7 +32,6 @@ import javax.mail.internet.MimeMessage;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -66,13 +64,18 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	private TreeMap<String, Message> latestMessages;
 	private String lastPollUid;
 	
+	private LinkedList<Message> imodeRecvMessages;
+	private LinkedList<Message> imodeSendMessages;
+	private LinkedList<Message> pop3RecvMessages;
+	private List<String> syncFolders;
+	
 	public SpmodeImapReader(ServerMain server){
 		this.conf = server.conf;
 		this.status = server.status;
 
 		this.props = new Properties();
 		log.info("spmode: imap");
-		props.setProperty("mail.imap.host", "imap2.spmode.ne.jp");
+		props.setProperty("mail.imap.host", "imap.spmode.ne.jp");
 		props.setProperty("mail.imap.port", "993");
 		props.setProperty("mail.imap.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
 		props.setProperty("mail.imap.socketFactory.fallback", "false");
@@ -91,6 +94,10 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		this.latestMessages = new TreeMap<String, Message>();
 		this.lastPollUid = "";
 
+		this.imodeRecvMessages = new LinkedList<Message>();
+		this.imodeSendMessages = new LinkedList<Message>();
+		this.pop3RecvMessages = new LinkedList<Message>();
+		this.syncFolders = new ArrayList<String>();
 	}
 	
 	public Store connect(Store str, boolean readSent) throws MessagingException {
@@ -119,6 +126,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 				ignoreFolders.add(s);
 			}
 		}
+		ignoreFolders.addAll(syncFolders);
 		// ここ(readSent)だけ座りが悪い
 		if(readSent){
 			ignoreFolders.remove(sentFolder);
@@ -145,12 +153,11 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		return store;
 	}
 
-	public Folder getSentFolder() {
+	public IMAPFolder getSentFolder() {
 		try{
 			Folder rootFolder = store.getDefaultFolder();
 			Folder folder = rootFolder.getFolder(sentFolder);
-			folder.open(Folder.READ_WRITE);
-			return folder;
+			return (IMAPFolder)folder;
 		} catch (MessagingException me){
 			return null;
 		}
@@ -192,19 +199,9 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 				msg = messages[index];
 				boolean seen = msg.isSet(Flags.Flag.SEEN);
 				String id = getUid(folder, msg);
-				try {
-					StringBuilder maildata = new StringBuilder();
-					@SuppressWarnings("unchecked")
-					Enumeration<Header> e = msg.getAllHeaders();
-					while (e.hasMoreElements()) {
-				    	Header h = e.nextElement();
-				    	maildata.append(h.getName()).append(": ").append(h.getValue()).append("\n");
-				    }
-					maildata.append("\n");
-					byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
-					maildata.append(new String(contentData)).append("\n");
-					log.info("取得メール情報:"+id+"\n"+maildata);
-				}catch(Exception e){}
+
+				StringBuilder maildata = Util.dumpMessage(msg);
+				log.info("取得メール情報:"+id+"\n"+maildata);
 
 				if(isSent){
 					/*
@@ -391,5 +388,69 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		//log.info("IMAPフォルダクローズ実行");
 		closeAllFolder();
 		this.doingImapIdle = false;
+	}
+	
+	/*
+	 * iモード、spモード(pop3)の送受信メールをIMAPに同期するための処理
+	 */
+	public void addSyncFolder(String folderName) {
+		this.syncFolders.add(folderName);
+	}
+	
+	public void putImodeMail(ImodeMail mail) {
+		int folderId = mail.getFolderId();
+		if (folderId==ImodeNetClient.FolderIdSent) {
+			imodeSendMessages.add(mail.getMessage());
+			if (imodeSendMessages.size()>=10){
+				saveImodeMail();
+			}
+		}else{
+			imodeRecvMessages.add(mail.getMessage());
+			if (imodeRecvMessages.size()>=10){
+				saveImodeMail();
+			}
+		}
+	}
+	public void putPop3Mail(Message msg) {
+		pop3RecvMessages.add(msg);
+		if (pop3RecvMessages.size()>=10){
+			savePop3Mail();
+		}
+	}
+
+	public void saveImodeMail() {
+		saveMail(conf.getImodenetSyncFolder(), imodeRecvMessages);
+		saveMail(conf.getImodenetSyncSentFolder(), imodeSendMessages);
+	}
+	public void savePop3Mail() {
+		saveMail(conf.getSpmodePop3SyncFolder(), pop3RecvMessages);
+	}
+	private void saveMail(String folderName, LinkedList<Message> messages){
+		synchronized (messages) {
+			int count = messages.size();
+			if (count>0) {
+				try{
+					Folder rootFolder = store.getDefaultFolder();
+					IMAPFolder folder = (IMAPFolder) rootFolder.getFolder(folderName);
+					if(!folder.exists()){
+						folder.create(Folder.HOLDS_MESSAGES);
+					}
+					folder.open(Folder.READ_WRITE);
+					synchronized (messages) {
+						Message[] ma = folder.addMessages(messages.toArray(new Message[0]));
+						for (Message m : ma){
+							m.setFlag(Flags.Flag.SEEN, true);
+						}
+					}
+					folder.close(false);
+					
+					log.info("ドコモメール["+folderName+"]にメールを "+count+"通 保存しました");
+
+				} catch (MessagingException me){
+					log.error("saveMail:"+folderName,me);
+				}
+				messages.clear();
+			}
+		}
 	}
 }

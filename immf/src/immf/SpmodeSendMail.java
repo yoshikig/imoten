@@ -417,7 +417,10 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		String result = super.send();
 		if(sentFolder!=null){
 			Message msg = getMimeMessage();
+			StringBuilder maildata = Util.dumpMessage(msg);
+			log.info("送信メール情報:\n"+maildata);
 			try {
+				sentFolder.open(Folder.READ_WRITE);
 				Message[] ma = { msg };
 				ma = sentFolder.addMessages(ma);
 				for (Message m : ma){
@@ -477,7 +480,7 @@ public class SpmodeSendMail extends MyHtmlEmail {
 		SpmodeSendMail.goomojiSubjectCharConv = goomojiSubjectCharConv;
 	}
 	
-	public void setImapSentFolder(Folder folder) {
-		this.sentFolder = (IMAPFolder)folder;
+	public void setImapSentFolder(IMAPFolder folder) {
+		this.sentFolder = folder;
 	}
 }

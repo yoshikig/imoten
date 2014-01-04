@@ -204,8 +204,9 @@ public class ServerMain {
 
 		if(this.doForwading) {
 			// iモードメール着信監視
+			ImodeCheckMail imodeChecker = null;
 			if(this.conf.isImodenetEnable()&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
-				ImodeCheckMail imodeChecker = new ImodeCheckMail(this);
+				imodeChecker = new ImodeCheckMail(this);
 				Thread ti = new Thread(imodeChecker);
 				ti.setName("ImodeChecker");
 				ti.setDaemon(true);
@@ -213,24 +214,40 @@ public class ServerMain {
 			}
 		
 			// spモードメール着信監視
+			SpmodeCheckMail spmodePop3Checker = null;
+			SpmodeCheckMail spmodeImapChecker = null;
 			if(this.conf.isSpmodeEnable()){
 				String protocol = conf.getSpmodeProtocol();
 				if(!protocol.equalsIgnoreCase("imap")
 						&&this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
-					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this, "pop3");
-					Thread ts = new Thread(spmodeChecker);
+					// pop3
+					spmodePop3Checker = new SpmodeCheckMail(this, "pop3");
+					Thread ts = new Thread(spmodePop3Checker);
 					ts.setName("SpmodeChecker[pop3]");
 					ts.setDaemon(true);
 					ts.start();
 				}
 				if(!protocol.equalsIgnoreCase("pop3")
 						&&this.conf.getSpmodeMailUser()!=null&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
-					SpmodeCheckMail spmodeChecker = new SpmodeCheckMail(this, "imap");
-					Thread ts = new Thread(spmodeChecker);
+					// imap
+					spmodeImapChecker = new SpmodeCheckMail(this, "imap");
+					Thread ts = new Thread(spmodeImapChecker);
 					ts.setName("SpmodeChecker[imap]");
 					ts.setDaemon(true);
 					ts.start();
-					sendmail.setImapChecker(spmodeChecker);
+					if (sendmail!=null) {
+						sendmail.setImapChecker(spmodeImapChecker);
+					}
+					SpmodeImapReader imapreader = spmodeImapChecker.getImapReader();
+					if (conf.isImodenetSyncImap() && imodeChecker!=null) {
+						imodeChecker.setImapReader(imapreader);
+						imapreader.addSyncFolder(conf.getImodenetSyncFolder());
+						imapreader.addSyncFolder(conf.getImodenetSyncSentFolder());
+					}
+					if (conf.isSpmodePop3SyncImap() && spmodePop3Checker!=null) {
+						spmodePop3Checker.setImapReader(imapreader);
+						imapreader.addSyncFolder(conf.getSpmodePop3SyncFolder());
+					}
 				}
 			}
 		}

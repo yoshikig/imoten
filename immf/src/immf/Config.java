@@ -247,6 +247,15 @@ public class Config {
 	private String senderTlsKeyType;
 	private String senderTlsKeyPasswd;
 
+	// ドコモメール同期設定
+	private boolean imodenetSyncImap = false;
+	private boolean imodenetSyncOnly = false;
+	private boolean spmodePop3SyncImap = false;
+	private boolean spmodePop3SyncOnly = false;
+	private String imodenetSyncFolder = "受信BOX(iモード)";
+	private String imodenetSyncSentFolder = "送信BOX(iモード)";
+	private String spmodePop3SyncFolder = "メッセージR/S";
+	
 	// Skypeに転送
 	private String forwardSkypeChat;
 	private String forwardSkypeSms;
@@ -465,6 +474,13 @@ public class Config {
 			this.senderSpmodeEmojiCharset = SenderSpmodeEmojiCharset.SMART;
 		}
 		this.senderSpmodeNoAddressbook = getBoolean("sender.spmode.noaddressbook", this.senderSpmodeNoAddressbook);
+		this.imodenetSyncImap = getBoolean("imodenet.syncimap", this.imodenetSyncImap);
+		this.imodenetSyncOnly = getBoolean("imodenet.syncimap.only", this.imodenetSyncOnly);
+		this.imodenetSyncFolder = getString("imodenet.syncimap.folder", this.imodenetSyncFolder);
+		this.imodenetSyncSentFolder = getString("imodenet.syncimap.sentfolder", this.imodenetSyncSentFolder);
+		this.spmodePop3SyncImap = getBoolean("spmode.syncimap", this.spmodePop3SyncImap);
+		this.spmodePop3SyncOnly = getBoolean("spmode.syncimap.only", this.spmodePop3SyncOnly);
+		this.spmodePop3SyncFolder = getString("spmode.syncimap.folder", this.spmodePop3SyncFolder); 
 
 		// 最小値
 		this.checkIntervalSec = Math.max(this.checkIntervalSec, 3);
@@ -1059,5 +1075,32 @@ public class Config {
 	public String getSentSubjectAppendSuffix() {
 		return sentSubjectAppendSuffix;
 	}
-}
 
+	public boolean isImodenetSyncImap() {
+		return imodenetSyncImap;
+	}
+
+	public boolean isImodenetSyncOnly() {
+		return imodenetSyncOnly;
+	}
+
+	public String getImodenetSyncFolder() {
+		return imodenetSyncFolder;
+	}
+
+	public String getImodenetSyncSentFolder() {
+		return imodenetSyncSentFolder;
+	}
+
+	public boolean isSpmodePop3SyncImap() {
+		return spmodePop3SyncImap;
+	}
+
+	public boolean isSpmodePop3SyncOnly() {
+		return spmodePop3SyncOnly;
+	}
+
+	public String getSpmodePop3SyncFolder() {
+		return spmodePop3SyncFolder;
+	}
+}

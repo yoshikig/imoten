@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 
 import javax.mail.BodyPart;
-import javax.mail.Folder;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
@@ -44,6 +43,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.subethamail.smtp.auth.LoginFailedException;
 import org.subethamail.smtp.auth.UsernamePasswordValidator;
+
+import com.sun.mail.imap.IMAPFolder;
 
 public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailListener{
 	private static final int MaxRecipient = 5;
@@ -177,7 +178,7 @@ public class SendMailBridge implements UsernamePasswordValidator, MyWiserMailLis
 				log.info("spモード動作モード");
 				SpmodeSendMail spmodeSendMail = new SpmodeSendMail(mime,recipients,conf);
 				if (imapchecker != null) {
-					Folder sentFolder = imapchecker.getSentFolder();
+					IMAPFolder sentFolder = imapchecker.getSentFolder();
 					spmodeSendMail.setImapSentFolder(sentFolder);
 				}
 				spmodeSendMail.send();

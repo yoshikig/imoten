@@ -52,6 +52,10 @@ public class SpmodePop3Reader extends SpmodeReader{
 	private LinkedList<Message> allMessages = new LinkedList<Message>();
 	private Message latestMessage = null;
 	private String lastPollId = "";
+	
+	private SpmodeImapReader imapreader = null;
+	private boolean syncImapFolder = false;
+	private boolean syncImapOnly = false;
 
 	public SpmodePop3Reader(ServerMain server){
 		this.conf = server.conf;
@@ -73,6 +77,8 @@ public class SpmodePop3Reader extends SpmodeReader{
 		this.passwd = conf.getDocomoPasswd();
 
 		this.unknownForwardLimit = this.conf.getSpmodeUnknownForwardLimit();
+		this.syncImapFolder = this.conf.isSpmodePop3SyncImap();
+		this.syncImapOnly = this.conf.isSpmodePop3SyncOnly();
 	}
 	
 	public Store connect(Store str, boolean readSent) throws MessagingException {
@@ -164,13 +170,29 @@ public class SpmodePop3Reader extends SpmodeReader{
 		//メールの取得
 		for (int index = start + 1; index < messageLength; index++) {
 			msg = messages[index];
-			try {
-				byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
-				log.info("Content-Type:"+msg.getContentType());
-				log.info("Content[\n"+new String(contentData)+"\n]");
-			}catch(Exception e){}
+
+			StringBuilder maildata = Util.dumpMessage(msg);
+			log.info("取得メール情報\n"+maildata);
 
 			allMessages.add(msg);
+			if(syncImapFolder){
+				try{
+					imapreader.putPop3Mail(msg);
+				} catch (Exception e){
+					log.error("IMAP同期処理でエラー発生",e);
+				}
+			}
+		}
+		
+		if(syncImapFolder && getMessageCount()>0){
+			try{
+				imapreader.savePop3Mail();
+			} catch (Exception e){
+				log.error("IMAP同期処理でエラー発生",e);
+			}
+			if(syncImapOnly){
+				allMessages.clear();
+			}
 		}
 	}
 	
@@ -236,5 +258,9 @@ public class SpmodePop3Reader extends SpmodeReader{
 		}catch (Exception e){
 			return "";
 		}
+	}
+	
+	public void setImapReader(SpmodeImapReader imapreader){
+		this.imapreader = imapreader;
 	}
 }

@@ -30,11 +30,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
+import java.util.Enumeration;
 import java.util.Iterator;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import javax.mail.Header;
+import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Part;
 import javax.mail.internet.ContentDisposition;
@@ -718,5 +721,20 @@ public class Util {
 			subject = subject.replaceAll("^R[eE]: ?R[eE]\\d*:", "Re" + Integer.toString(reCounter) + ":");
 		}
 		return subject;
+	}
+	@SuppressWarnings("unchecked")
+	public static StringBuilder dumpMessage(Message msg){
+		StringBuilder maildata = new StringBuilder();
+		try {
+			Enumeration<Header> e = msg.getAllHeaders();
+			while (e.hasMoreElements()) {
+		    	Header h = e.nextElement();
+		    	maildata.append(h.getName()).append(": ").append(h.getValue()).append("\n");
+		    }
+			maildata.append("\n");
+			byte contentData[] = Util.inputstream2bytes(msg.getInputStream());
+			maildata.append(new String(contentData));
+		}catch(Exception e){}
+		return maildata; 
 	}
 }
