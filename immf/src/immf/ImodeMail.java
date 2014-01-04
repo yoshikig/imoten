@@ -318,6 +318,7 @@ public class ImodeMail {
 						thisPartHeader.setHeader("Content-Transfer-Encoding", "base64");
 						MimeBodyPart thisPart = new MimeBodyPart(thisPartHeader, f.getBase64Data());
 						
+						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
 						thisPart.setDisposition(BodyPart.INLINE);
 						thisPart.setContentID("<"+f.getId()+">");
 						relatedMultipart.addBodyPart(thisPart);
