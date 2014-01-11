@@ -26,7 +26,6 @@ import immf.growl.GrowlNotifier;
 import javax.mail.AuthenticationFailedException;
 import javax.mail.Message;
 import javax.mail.MessagingException;
-import javax.mail.Store;
 import javax.mail.internet.InternetAddress;
 
 import java.io.BufferedReader;
@@ -106,7 +105,6 @@ public class SpmodeCheckMail implements Runnable {
 		int intervalSec = 0;
 		int fwdRetryLimit = conf.getForwardRetryMaxCount();
 		int fwdRetryCount = 0;
-		Store store = null;
 		
 		while(true){
 			boolean forwarded = false;
@@ -119,7 +117,18 @@ public class SpmodeCheckMail implements Runnable {
 			}
 
 			try{
-				store = sr.connect(store, this.forwardSent);
+				// 初回
+				if (!sr.isReady()){
+					sr.connect();
+				}
+				while(!sr.isReady()){
+					try{
+						Thread.sleep(100);
+					}catch (Exception e) {}
+				}
+
+				//メールボックスオープン
+				sr.open(this.forwardSent);
 				
 				//メールの取得
 				sr.getMessages();

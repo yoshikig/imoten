@@ -43,8 +43,9 @@ public class SpmodePop3Reader extends SpmodeReader{
 	private StatusManager status;
 
 	private Properties props;
-	private String myname = "";
-	private String passwd = "";
+	private String myname;
+	private String passwd;
+	private Store store = null;
 	private int unknownForwardLimit;
 
 	private Date initialCheckDate = null;
@@ -52,6 +53,7 @@ public class SpmodePop3Reader extends SpmodeReader{
 	private LinkedList<Message> allMessages = new LinkedList<Message>();
 	private Message latestMessage = null;
 	private String lastPollId = "";
+	private boolean isInitialized = false;
 	
 	private SpmodeImapReader imapreader = null;
 	private boolean syncImapFolder = false;
@@ -68,10 +70,8 @@ public class SpmodePop3Reader extends SpmodeReader{
 		props.setProperty("mail.pop3.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
 		props.setProperty("mail.pop3.socketFactory.fallback", "false");
 		props.setProperty("mail.pop3.socketFactory.port", "995");
-
-		// XXX 設定可能にする？
-		//props.setProperty("mail.pop3.connectiontimeout", XXX);
-		//props.setProperty("mail.pop3.timeout", XXX);
+		props.setProperty("mail.pop3.connectiontimeout", Integer.toString(conf.getPop3ConnectTimeoutSec()*1000));
+		props.setProperty("mail.pop3.timeout", Integer.toString(conf.getPop3TimeoutSec()*1000));
 
 		this.myname = conf.getDocomoId();
 		this.passwd = conf.getDocomoPasswd();
@@ -81,19 +81,19 @@ public class SpmodePop3Reader extends SpmodeReader{
 		this.syncImapOnly = this.conf.isSpmodePop3SyncOnly();
 	}
 	
-	public Store connect(Store str, boolean readSent) throws MessagingException {
-		
-		Session session = null;
-		Store store = null;
-		if(str==null || !str.isConnected()){
-			session = Session.getInstance(props, null);
+	public void connect() throws MessagingException {
+		if(store==null || !store.isConnected()){
+			Session session = Session.getInstance(props, null);
 			session.setDebug(conf.isMailDebugEnable());
 		
 			store = session.getStore("pop3");
 			store.connect(myname, passwd);
-		} else {
-			store = str;
 		}
+		this.isInitialized = true;
+	}
+		
+	public void open(boolean readSent) throws MessagingException {
+		connect();
 		
 		latestMessage = null;
 		
@@ -108,7 +108,6 @@ public class SpmodePop3Reader extends SpmodeReader{
 				folder.open(Folder.READ_ONLY);
 			}
 		}
-		return store;
 	}
 
 	public void getMessages() throws MessagingException {
@@ -250,6 +249,10 @@ public class SpmodePop3Reader extends SpmodeReader{
 				folder.close(false);
 			}
 		}catch (MessagingException e){}
+	}
+	
+	public boolean isReady() {
+		return this.isInitialized;
 	}
 	
 	private String getId(Message m) {

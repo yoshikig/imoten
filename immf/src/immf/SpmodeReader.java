@@ -23,10 +23,10 @@ package immf;
 
 import javax.mail.Message;
 import javax.mail.MessagingException;
-import javax.mail.Store;
 
 public abstract class SpmodeReader{
-	public abstract Store connect(Store str, boolean readSent) throws MessagingException;
+	public abstract void connect() throws MessagingException;
+	public abstract void open(boolean readSent) throws MessagingException;
 	public abstract void getMessages() throws MessagingException;
 	public abstract int getMessageCount();
 	public abstract Message readMessage();
@@ -36,4 +36,5 @@ public abstract class SpmodeReader{
 	protected abstract String getLastId();
 	public abstract void waitMessage();
 	public abstract void close();
+	public abstract boolean isReady();
 }

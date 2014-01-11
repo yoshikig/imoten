@@ -81,6 +81,15 @@ public class Config {
 	private String popPasswd;
 	//private boolean popSsl = false;
 
+	// POP3サーバ
+	private int pop3ConnectTimeoutSec = 10;
+	private int pop3TimeoutSec = 30;
+
+	// IMAPサーバ
+	private int imapConnectTimeoutSec = 10;
+	private int imapTimeoutSec = 30;
+	private int imapIdleTimeoutSec = 590;
+
 	// 題名の絵文字を[晴れ]のような文字列に置き換えるかどうか
 	private boolean subjectEmojiReplace=true;
 
@@ -255,6 +264,7 @@ public class Config {
 	private String imodenetSyncFolder = "受信BOX(iモード)";
 	private String imodenetSyncSentFolder = "送信BOX(iモード)";
 	private String spmodePop3SyncFolder = "メッセージR/S";
+	private boolean spmodeSubscribeSyncFolder = true;
 	
 	// Skypeに転送
 	private String forwardSkypeChat;
@@ -357,6 +367,11 @@ public class Config {
 		this.popUser = 			getString("popbeforesmtp.user", null);
 		this.popPasswd =		getString("popbeforesmtp.passwd", null);
 		//this.popSsl = 			getBoolean("popbeforesmtp.ssl", this.popSsl);
+		this.pop3ConnectTimeoutSec = getInt("spmode.pop3.connecttimeout", this.pop3ConnectTimeoutSec);
+		this.pop3TimeoutSec = getInt("spmode.pop3.timeout", this.pop3TimeoutSec);
+		this.imapConnectTimeoutSec = getInt("spmode.imap.connecttimeout", this.imapConnectTimeoutSec);
+		this.imapTimeoutSec = getInt("spmode.imap.timeout", this.imapTimeoutSec);
+		this.imapIdleTimeoutSec = getInt("spmode.imap.idletimeout", this.imapIdleTimeoutSec);
 		/*
 		this.subjectEmojiReplace = getBoolean("emojireplace.subject", this.subjectEmojiReplace);
 		String s = getString("emojireplace.body", "inline");
@@ -481,6 +496,7 @@ public class Config {
 		this.spmodePop3SyncImap = getBoolean("spmode.syncimap", this.spmodePop3SyncImap);
 		this.spmodePop3SyncOnly = getBoolean("spmode.syncimap.only", this.spmodePop3SyncOnly);
 		this.spmodePop3SyncFolder = getString("spmode.syncimap.folder", this.spmodePop3SyncFolder); 
+		this.spmodeSubscribeSyncFolder = getBoolean("_spmode.mbox.subscribesync", this.spmodeSubscribeSyncFolder);
 
 		// 最小値
 		this.checkIntervalSec = Math.max(this.checkIntervalSec, 3);
@@ -489,9 +505,17 @@ public class Config {
 		this.spmodeCheckIntervalSec = Math.max(this.spmodeCheckIntervalSec, 10);
 		this.smtpConnectTimeoutSec = Math.max(this.smtpConnectTimeoutSec, 10);
 		this.smtpTimeoutSec = Math.max(this.smtpTimeoutSec, 3);
+		this.pop3ConnectTimeoutSec = Math.max(this.pop3ConnectTimeoutSec, 10);
+		this.pop3TimeoutSec = Math.max(this.pop3TimeoutSec, 3);
+		this.imapConnectTimeoutSec = Math.max(this.imapConnectTimeoutSec, 10);
+		this.imapTimeoutSec = Math.max(this.imapTimeoutSec, 3);
+		this.imapIdleTimeoutSec = Math.max(this.imapIdleTimeoutSec, 5*60);
 		this.loginRetryIntervalSec = Math.max(this.loginRetryIntervalSec, 3);
 		this.httpConnectTimeoutSec = Math.max(this.httpConnectTimeoutSec, 3);
 		this.httpSoTimeoutSec = Math.max(this.httpSoTimeoutSec, 3);
+
+		// 最大値
+		this.imapIdleTimeoutSec = Math.min(this.imapIdleTimeoutSec, 30*60);
 
 		try{
 			Charset.forName(this.mailEncode).name();
@@ -840,6 +864,26 @@ public class Config {
 		return smtpTimeoutSec;
 	}
 
+	public int getPop3ConnectTimeoutSec() {
+		return pop3ConnectTimeoutSec;
+	}
+
+	public int getPop3TimeoutSec() {
+		return pop3TimeoutSec;
+	}
+
+	public int getImapConnectTimeoutSec() {
+		return imapConnectTimeoutSec;
+	}
+
+	public int getImapTimeoutSec() {
+		return imapTimeoutSec;
+	}
+
+	public int getImapIdleTimeoutSec() {
+		return imapIdleTimeoutSec;
+	}
+
 	public static String getConfFile() {
 		return ConfFile;
 	}
@@ -1102,5 +1146,9 @@ public class Config {
 
 	public String getSpmodePop3SyncFolder() {
 		return spmodePop3SyncFolder;
+	}
+
+	public boolean isSpmodeSubscribeSyncFolder() {
+		return spmodeSubscribeSyncFolder;
 	}
 }

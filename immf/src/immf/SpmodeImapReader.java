@@ -56,13 +56,14 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	private Properties props;
 	private String myname;
 	private String passwd;
-	private Store store;
+	private Store store = null;
 	
 	private boolean doingImapIdle;
 	private List<Folder> folderList;
 	private TreeMap<String, Message> allMessages;
 	private TreeMap<String, Message> latestMessages;
 	private String lastPollUid;
+	private boolean isInitialized = false;
 	
 	private LinkedList<Message> imodeRecvMessages;
 	private LinkedList<Message> imodeSendMessages;
@@ -80,10 +81,8 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		props.setProperty("mail.imap.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
 		props.setProperty("mail.imap.socketFactory.fallback", "false");
 		props.setProperty("mail.imap.socketFactory.port", "993");
-
-		// XXX 設定可能にする？
-		//props.setProperty("mail.imap.connectiontimeout", XXX);
-		//props.setProperty("mail.imap.timeout", XXX);
+		props.setProperty("mail.imap.connectiontimeout", Integer.toString(conf.getImapConnectTimeoutSec()*1000));
+		props.setProperty("mail.imap.timeout", Integer.toString(conf.getImapTimeoutSec()*1000));
 
 		this.myname = conf.getDocomoId();
 		this.passwd = conf.getDocomoPasswd();
@@ -100,18 +99,18 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		this.syncFolders = new ArrayList<String>();
 	}
 	
-	public Store connect(Store str, boolean readSent) throws MessagingException {
-		
-		Session session = null;
-		if(str==null || !str.isConnected()){
-			session = Session.getInstance(props, null);
+	public void connect() throws MessagingException {
+		if(store==null || !store.isConnected()){
+			Session session = Session.getInstance(props, null);
 			session.setDebug(conf.isMailDebugEnable());
 		
 			store = session.getStore("imap");
 			store.connect(myname, passwd);
-		} else {
-			store = str;
 		}
+	}
+		
+	public void open(boolean readSent) throws MessagingException {
+		connect();
 		
 		folderList.clear();
 		latestMessages.clear();
@@ -150,10 +149,15 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 			}
 			folderList.add(f);
 		}
-		return store;
 	}
 
 	public IMAPFolder getSentFolder() {
+		// 接続待ち
+		while (store==null) {
+			try{
+				Thread.sleep(100);
+			}catch (Exception e) {}
+		}
 		try{
 			Folder rootFolder = store.getDefaultFolder();
 			Folder folder = rootFolder.getFolder(sentFolder);
@@ -269,13 +273,16 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	}
 	
 	public void updateLastId() {
-		this.status.setLastSpMsgUid(getLatestId());
-		log.info("lastspmsgUidを更新しました");
-		try{
-			this.status.save();
-			log.info("statusファイルを保存しました");
-		}catch (Exception e) {
-			log.error("Status File save Error.",e);
+		String thisId = getLatestId();
+		if(thisId.compareToIgnoreCase(getLastId())>0){
+			this.status.setLastSpMsgUid(thisId);
+			log.info("lastspmsgUidを更新しました");
+			try{
+				this.status.save();
+				log.info("statusファイルを保存しました");
+			}catch (Exception e) {
+				log.error("Status File save Error.",e);
+			}
 		}
 	}
 	
@@ -325,6 +332,14 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		}
 	}
 	
+	public boolean isReady() {
+		return this.isInitialized;
+	}
+	
+	public void setInitialized() {
+		this.isInitialized = true;
+	}
+	
 	private String getUid(Folder f, Message m) throws MessagingException{
 		long uid = getLongUid(f, m);
 		return String.format("%019d", uid);
@@ -370,8 +385,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		}
 		public void run() {
 			try{
-				// 10分弱待つ
-				Thread.sleep(590*1000);
+				Thread.sleep(conf.getImapIdleTimeoutSec()*1000);
 			}catch(Exception e){}
 			try{
 				if (open) {
@@ -395,6 +409,38 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	 */
 	public void addSyncFolder(String folderName) {
 		this.syncFolders.add(folderName);
+		log.info("["+folderName+"]は同期先フォルダのためIMAPチェック対象外です。");
+
+		// 接続待ち
+		while (store==null) {
+			try{
+				Thread.sleep(100);
+			}catch (Exception e) {}
+		}
+		
+		// 購読状態のチェック
+		boolean doSubscribe = conf.isSpmodeSubscribeSyncFolder();
+		try{
+			Folder rootFolder = store.getDefaultFolder();
+			Folder folder = rootFolder.getFolder(folderName);
+			if (folder.exists()) {
+				if (!doSubscribe && folder.isSubscribed()) {
+					// unsubscribe 指示
+					folder.setSubscribed(false);
+					log.info("["+folderName+"]をunsubscribeしました。");
+				} else if (doSubscribe && !folder.isSubscribed()){
+					// subscribe 指示
+					folder.setSubscribed(true);
+					log.info("["+folderName+"]をsubscribeしました。");
+				}
+			}
+		} catch (MessagingException me){
+			if (doSubscribe) {
+				log.warn("["+folderName+"]のsubscribeに失敗しました。",me);
+			} else {
+				log.warn("["+folderName+"]のunsubscribeに失敗しました。",me);
+			}
+		}
 	}
 	
 	public void putImodeMail(ImodeMail mail) {
@@ -429,22 +475,33 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		synchronized (messages) {
 			int count = messages.size();
 			if (count>0) {
+				// 接続待ち
+				while (store==null) {
+					try{
+						Thread.sleep(100);
+					}catch (Exception e) {}
+				}
+
 				try{
 					Folder rootFolder = store.getDefaultFolder();
 					IMAPFolder folder = (IMAPFolder) rootFolder.getFolder(folderName);
 					if(!folder.exists()){
 						folder.create(Folder.HOLDS_MESSAGES);
+						if (conf.isSpmodeSubscribeSyncFolder()) {
+							folder.setSubscribed(true);
+						}
 					}
 					folder.open(Folder.READ_WRITE);
-					synchronized (messages) {
-						Message[] ma = folder.addMessages(messages.toArray(new Message[0]));
-						for (Message m : ma){
-							m.setFlag(Flags.Flag.SEEN, true);
-						}
+					Message[] ma = folder.addMessages(messages.toArray(new Message[0]));
+					for (Message m : ma){
+						m.setFlag(Flags.Flag.SEEN, true);
+						this.lastPollUid = getUid(folder, m);
+						log.info("保存メッセージのUID:"+this.lastPollUid);
 					}
 					folder.close(false);
 					
 					log.info("ドコモメール["+folderName+"]にメールを "+count+"通 保存しました");
+					updateLastId();
 
 				} catch (MessagingException me){
 					log.error("saveMail:"+folderName,me);
