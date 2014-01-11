@@ -122,7 +122,7 @@ forward.sent.subject.suffix
 　デフォルト空文字列。
 
 forward.sent
-　[true]の場合、iモード.net上の送信済みメールを受信メールと同じように転送します。
+　[true]の場合、iモード.net上の送信済みメールやドコモメール上の送信BOXを受信メールと同じように転送します。
 　デフォルト false
 
 forward.to
@@ -661,6 +661,30 @@ spmode.systemfolder
 　設定例：spmode.systemfolder=Sent,Drafts,Trash,任意のフォルダ
 　デフォルト[Sent,Drafts,Trash]
 
+spmode.pop3.connecttimeout
+　spモードメール(pop3)メールサーバとの接続タイムアウト時間(秒)。
+　デフォルト[10]
+
+spmode.pop3.timeout
+　spモードメール(pop3)メールサーバとの送受信タイムアウト時間(秒)。
+　デフォルト[30]
+
+spmode.imap.connecttimeout
+　ドコモメールIMAPメールサーバとの接続タイムアウト時間(秒)。
+　デフォルト[10]
+
+spmode.imap.timeout
+　ドコモメールIMAPメールサーバとの送受信タイムアウト時間(秒)。
+　デフォルト[30]
+
+spmode.imap.idletimeout
+　spmode.protocol=imapの時にのみ有効なパラメータです。
+　ドコモメールのメールチェックで使用するIMAP IDLEを再実行するためのタイムアウト時間(秒)。
+　5分～30分の範囲で指定できます。ドコモメール IMAPインタフェース仕様書では30分となっていますが、
+　10分以上経過するとIMAP IDLEによる着信通知が無効化するという報告があがっているため
+　通常はデフォルト値から変更する必要はありません。
+　デフォルト[590]
+
 forward.only
 　[forward.]からはじまる各転送先設定をiモードメールを受信した場合のみ転送するのか、
 　spモードメールを受信した場合のみ転送するのか指定できます。
@@ -696,6 +720,48 @@ sender.spmode.noaddressbook
 　メール送信時にアドレス帳情報を削除してメールの受取人にはToやCcではメールアドレスだけ
 　見えるようにしたい場合はtrueを設定してください。
 　デフォルト[false]
+
+以下はimode.netの受信メールやspモードメール(pop3)の受信メールをドコモメールのメールボックスに
+同期(アップロード保存)するための設定パラメータです。
+
+imodenet.syncimap
+　trueに設定するとimode.netの受信メールをドコモメールのメールボックスに同期します。
+　同期先のフォルダ名称は[imodenet.syncimap.folder]と[imodenet.syncimap.sentfolder]で設定します。
+　imode.netの受信・転送設定がされている場合に設定可能です。
+　デフォルト[false]
+
+imodenet.syncimap.only
+　[imodenet.syncimap]を有効化している場合に、imode.netのメールはドコモメールへ同期する目的のみで受信し、
+　imode.netのメール転送を行いたくない場合に true を設定します。
+　例えば過去に受信したメールを同期するために読み出した際にそれらの過去メールを再転送させたくない場合に
+　設定してください。
+　デフォルト[false]
+
+imodenet.syncimap.folder
+　imode.netで受信したメールはこのパラメータで指定したドコモメールのフォルダに保存されます。
+　デフォルト[受信BOX(iモード)]
+
+imodenet.syncimap.sentfolder
+　[forward.sent]を設定してimode.netのメール転送設定を行っている場合、受信した送信済みメールは
+　このパラメータで指定したフォルダに保存されます。
+　デフォルト[送信BOX(iモード)]
+
+spmode.syncimap
+　trueに設定するとspモードメール(pop3)の受信メールをドコモメールのメールボックスに同期します。
+　同期先のフォルダ名称は[spmode.syncimap.folder]で設定します。
+　spモードメール(pop3)の受信・転送設定がされている場合に設定可能です。
+　デフォルト[false]
+
+spmode.syncimap.only
+　[spmode.syncimap]を有効化している場合に、spモードメール(pop3)はドコモメールへ同期する目的のみで受信し、
+　spモードメール(pop3)のメール転送を行いたくない場合に true を設定します。
+　例えば過去に受信したメールを同期するために読み出した際にそれらの過去メールを再転送させたくない場合に
+　設定してください。
+　デフォルト[false]
+
+spmode.syncimap.folder
+　spモードメール(pop3)で受信したメールはこのパラメータで指定したドコモメールのフォルダに保存されます。
+　デフォルト[メッセージR/S]
 
 
 ■サンプル
