@@ -120,11 +120,11 @@ public class SpmodeCheckMail implements Runnable {
 				// 初回
 				if (!sr.isReady()){
 					sr.connect();
-				}
-				while(!sr.isReady()){
-					try{
-						Thread.sleep(100);
-					}catch (Exception e) {}
+					while(!sr.isReady()){
+						try{
+							Thread.sleep(100);
+						}catch (Exception e) {}
+					}
 				}
 
 				//メールボックスオープン
