@@ -23,6 +23,7 @@
 package immf;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,6 +35,7 @@ import javax.mail.Message;
 import javax.mail.MessagingException;
 import javax.mail.Multipart;
 import javax.mail.Part;
+import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
@@ -42,6 +44,7 @@ import javax.mail.internet.MimeMultipart;
 import javax.mail.internet.MimeUtility;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.Email;
@@ -482,5 +485,55 @@ public class SpmodeSendMail extends MyHtmlEmail {
 	
 	public void setImapSentFolder(IMAPFolder folder) {
 		this.sentFolder = folder;
+	}
+
+	/*
+	 * メールアドレスに Personal name がなかった場合、メールヘッダのメールアドレスを
+	 *  Header: "address@example.com" <address@example.com>
+	 * とせずに
+	 *  Header: address@exapmle.com
+	 * とするための修正。但し、最終的にドコモ側で
+	 *  Header: <address@exapmle.com>
+	 * と修正される模様。
+	 * sender.spmode.noaddressbook=true の時に後者の形式でメール送信するため。
+	 */
+	private InternetAddress createSimpleInternetAddress(String email) throws EmailException {
+		InternetAddress address = null;
+		try {
+			address = new InternetAddress(email);
+			address.validate();
+		} catch (AddressException e) {
+			throw new EmailException(e);
+		}
+		return address;
+	}
+	@Override
+	public Email setFrom(String email, String name, String charset) throws EmailException {
+		if (StringUtils.isEmpty(name)) {
+			this.fromAddress = createSimpleInternetAddress(email);
+			return this;
+		} else {
+			return super.setFrom(email, name, charset);
+		}
+	}
+	@SuppressWarnings("unchecked")
+	@Override
+	public Email addTo(String email, String name, String charset) throws EmailException {
+		if (StringUtils.isEmpty(name)) {
+			this.toList.add(createSimpleInternetAddress(email));
+			return this;
+		} else {
+			return super.addTo(email, name, charset);
+		}
+	}
+	@SuppressWarnings("unchecked")
+	@Override
+	public Email addCc(String email, String name, String charset) throws EmailException {
+		if (StringUtils.isEmpty(name)) {
+			this.ccList.add(createSimpleInternetAddress(email));
+			return this;
+		} else {
+			return super.addCc(email, name, charset);
+		}
 	}
 }
