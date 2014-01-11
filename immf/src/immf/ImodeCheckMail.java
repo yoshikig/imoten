@@ -137,10 +137,12 @@ public class ImodeCheckMail implements Runnable{
 			}
 			
 			// IMAP同期
-			try {
-				imapreader.saveImodeMail();
-			}catch (Exception e1){
-				log.error("IMAP同期処理でエラー発生",e1);
+			if (syncImapFolder) {
+				try {
+					imapreader.saveImodeMail();
+				}catch (Exception e1){
+					log.error("IMAP同期処理でエラー発生",e1);
+				}
 			}
 
 			// 接続フラグのリセット
