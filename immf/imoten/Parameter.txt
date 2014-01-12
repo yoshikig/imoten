@@ -658,8 +658,8 @@ spmode.systemfolder
 　転送対象外と扱われます。自分でドコモメールに作成したフォルダを転送対象外にしたい場合は
 　このパラメータで設定できます。
 　設定する場合はデフォルト値に追加したいフォルダを追記して設定してください。
-　設定例：spmode.systemfolder=Sent,Drafts,Trash,任意のフォルダ
-　デフォルト[Sent,Drafts,Trash]
+　設定例：spmode.systemfolder=Sent,Drafts,Trash,迷惑メール＿ドコモ用,任意のフォルダ
+　デフォルト[Sent,Drafts,Trash,迷惑メール＿ドコモ用]
 
 spmode.pop3.connecttimeout
 　spモードメール(pop3)メールサーバとの接続タイムアウト時間(秒)。

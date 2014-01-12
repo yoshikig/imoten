@@ -48,7 +48,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	public static final String sentHeader = "X-IMOTEN-FOLDER-SENT";
 	private static final Log log = LogFactory.getLog(ServerMain.class);
 	private final String sentFolder = "Sent";
-	private final String[] systemFolders = { sentFolder, "Drafts", "Trash" };
+	private final String[] systemFolders = { sentFolder, "Drafts", "Trash", "迷惑メール＿ドコモ用" };
 
 	private Config conf;
 	private StatusManager status;
