@@ -30,6 +30,7 @@ import javax.activation.DataHandler;
 import javax.mail.BodyPart;
 import javax.mail.Message;
 import javax.mail.Session;
+import javax.mail.internet.ContentDisposition;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
@@ -317,9 +318,8 @@ public class ImodeMail {
 						thisPartHeader.setHeader("Content-Type", f.getContentType());
 						thisPartHeader.setHeader("Content-Transfer-Encoding", "base64");
 						MimeBodyPart thisPart = new MimeBodyPart(thisPartHeader, f.getBase64Data());
-						
-						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
 						thisPart.setDisposition(BodyPart.INLINE);
+						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
 						thisPart.setContentID("<"+f.getId()+">");
 						relatedMultipart.addBodyPart(thisPart);
 					}
@@ -333,9 +333,32 @@ public class ImodeMail {
 						thisPartHeader.setHeader("Content-Type", f.getContentType());
 						thisPartHeader.setHeader("Content-Transfer-Encoding", "base64");
 						MimeBodyPart thisPart = new MimeBodyPart(thisPartHeader, f.getBase64Data());
-
-						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
 						thisPart.setDisposition(BodyPart.ATTACHMENT);
+						Util.setFileName(thisPart, f.getFilename(), "Shift_JIS", null);
+
+						/*
+						 * 以下ドコモメールのおかしな仕様のためのFIX
+						 * Web版ドコモメールでは添付ファイルのダウンロードの際に添付ファイル名をブラウザに渡す際に
+						 * ファイル名を Content-Disposision から取得しているが、
+						 * その際にファイル名が Shift_JIS エンコーディングされていないとファイル名取得エラーとみなしてしまう。
+						 * 本処理ではこれに対処するために以下の取得できない形式(英字ファイル名)を取得できる形式2の形に直して
+						 * Content-Disposisionのファイル名を付与しなおす。
+						 * 
+						 * <正常だけとファイル名を取得できない書式>
+						 * Content-Disposition: attachment; filename=filename.jpg
+						 * <ファイル名を取得できる書式1>
+						 * Content-Disposition: attachment; filename="=?shift_jis?B?ZmlsZW5hbWUuanBn=?="
+						 * <ファイル名を取得できる書式2>
+						 * Content-Disposition: attachment; filename*=Shift_JIS''filename.jpg
+						 */
+						String filename = Util.getFileName(thisPart);
+						if (Util.isAllAscii(filename)) {
+							ContentDisposition disposition = new ContentDisposition(thisPart.getHeader("Content-Disposition")[0]);
+							disposition.getParameterList().remove("filename");
+							thisPart.setHeader("Content-Disposition",
+									disposition.toString() + ";\r\n filename*=Shift_JIS\'\'" + filename);
+						}
+
 						rootPart.addBodyPart(thisPart);
 					}
 				}
