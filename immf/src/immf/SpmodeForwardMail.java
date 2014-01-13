@@ -199,6 +199,27 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				// Dateヘッダ不正文字列混入（大抵spam）
 				smmDate = null;
 			}
+			if (smmDate==null){
+				/*
+				 * getSentDate()がnullを設定する場合とcatchに拾われてnullになる場合あり
+				 * getSentDate()はDate終端の()内が予期しない形式などの場合にnullを返す模様
+				 * 国内某銀行がこういうメールを送るようなのでこれは救っておく
+				 */
+				String date[] = smm.getHeader("Date");
+				if (date.length > 0) {
+					// Date: 終端の () は無視して内容を取り込む
+					SimpleDateFormat df = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z",Locale.US);
+					try {
+						smmDate = df.parse(date[0]);
+					} catch (Exception ee) {
+						log.error("Dateヘッダ取得エラー",ee);
+						smmDate = null;
+					}
+				} else {
+					smmDate = null;
+				}
+			}
+
 			// From:
 			smmFromAddr = this.addressBook.getInternetAddress((InternetAddress) smm.getFrom()[0],this.mailAddrCharset);
 			headerInfo.append(" From:    ").append(smmFromAddr.toUnicodeString()).append("\r\n");
@@ -814,7 +835,9 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 				}
 				SimpleDateFormat df = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss Z (z)",Locale.US);
 				msg.setHeader("Resent-Date", df.format(new Date()));
-				msg.setHeader("Date", df.format(this.smmDate));
+				if (smmDate!=null){
+					msg.setHeader("Date", df.format(this.smmDate));
+				}
 
 				msg.removeHeader("To");
 				msg.removeHeader("Cc");
@@ -889,7 +912,7 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			}
 
 		}catch (Exception e) {
-			log.warn(e);
+			log.error("buildMimeMessage()でエラー発生",e);
 		}
 	}
 
@@ -969,8 +992,10 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 		ImodeMail imodemail = new ImodeMail();
 		imodemail.setFromAddr(this.smmFromAddr);
 		imodemail.setDecomeFlg(false);
-		SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
-		imodemail.setTime(df.format(this.smmDate));
+		if (this.smmDate!=null){
+			SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
+			imodemail.setTime(df.format(this.smmDate));
+		}
 		String subject = this.subjectCharConv.convert(this.smmSubject);
 		imodemail.setSubject(subject);
 		String body = bodyMap.get(this.keyPlainBody);
