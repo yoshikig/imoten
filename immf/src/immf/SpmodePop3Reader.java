@@ -73,8 +73,8 @@ public class SpmodePop3Reader extends SpmodeReader{
 		props.setProperty("mail.pop3.connectiontimeout", Integer.toString(conf.getPop3ConnectTimeoutSec()*1000));
 		props.setProperty("mail.pop3.timeout", Integer.toString(conf.getPop3TimeoutSec()*1000));
 
-		this.myname = conf.getDocomoId();
-		this.passwd = conf.getDocomoPasswd();
+		this.myname = conf.getSpmodeMailUser();
+		this.passwd = conf.getSpmodeMailPasswd();
 
 		this.unknownForwardLimit = this.conf.getSpmodeUnknownForwardLimit();
 		this.syncImapFolder = this.conf.isSpmodePop3SyncImap();

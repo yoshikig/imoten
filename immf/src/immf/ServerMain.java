@@ -41,7 +41,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.cookie.Cookie;
 
 public class ServerMain {
-	public static final String Version = "imoten (imode.net mail tenson) ver. 1.1.45";
+	public static final String Version = "imoten (imode.net mail tenson) ver. 1.1.46";
 	private static final Log log = LogFactory.getLog(ServerMain.class);
 
 	public ImodeNetClient client;
@@ -201,27 +201,29 @@ public class ServerMain {
 		if(this.doForwading) {
 			// iモードメール着信監視
 			ImodeCheckMail imodeChecker = null;
+			Thread ti = null;
 			if(this.conf.isImodenetEnable()&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
 				imodeChecker = new ImodeCheckMail(this);
-				Thread ti = new Thread(imodeChecker);
+				ti = new Thread(imodeChecker);
 				ti.setName("ImodeChecker");
 				ti.setDaemon(true);
-				ti.start();
+				//ti.start();
 			}
 		
 			// spモードメール着信監視
 			SpmodeCheckMail spmodePop3Checker = null;
 			SpmodeCheckMail spmodeImapChecker = null;
+			Thread tsp = null;
 			if(this.conf.isSpmodeEnable()){
 				String protocol = conf.getSpmodeProtocol();
 				if(!protocol.equalsIgnoreCase("imap")
 						&&this.conf.getSpmodeMailUser()!=null&&conf.getSpmodeMailPasswd()!=null){
 					// pop3
 					spmodePop3Checker = new SpmodeCheckMail(this, "pop3");
-					Thread ts = new Thread(spmodePop3Checker);
-					ts.setName("SpmodeChecker[pop3]");
-					ts.setDaemon(true);
-					ts.start();
+					tsp = new Thread(spmodePop3Checker);
+					tsp.setName("SpmodeChecker[pop3]");
+					tsp.setDaemon(true);
+					//tsp.start();
 				}
 				if(!protocol.equalsIgnoreCase("pop3")
 						&&this.conf.getSpmodeMailUser()!=null&&this.conf.getDocomoId()!=null&&conf.getDocomoPasswd()!=null){
@@ -246,6 +248,15 @@ public class ServerMain {
 					}
 					imapreader.setInitialized();
 				}
+			}
+			
+			// iモードメール着信監視のスレッド開始
+			if (ti != null) {
+				ti.start();
+			}
+			// spモードメール(pop3)着信監視のスレッド開始
+			if (tsp != null) {
+				tsp.start();
 			}
 		}
 		
