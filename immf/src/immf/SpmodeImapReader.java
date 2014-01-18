@@ -274,15 +274,20 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 	
 	public void updateLastId() {
 		String thisId = getLatestId();
-		if(thisId.compareToIgnoreCase(getLastId())>0){
-			this.status.setLastSpMsgUid(thisId);
-			log.info("lastspmsgUidを更新しました");
-			try{
-				this.status.save();
-				log.info("statusファイルを保存しました");
-			}catch (Exception e) {
-				log.error("Status File save Error.",e);
-			}
+		String lastId = getLastId();
+		if(StringUtils.isBlank(thisId)) {
+			return;
+		}
+		if(!StringUtils.isBlank(lastId) && thisId.compareToIgnoreCase(getLastId())<0){
+			return;
+		}
+		this.status.setLastSpMsgUid(thisId);
+		log.info("lastspmsgUidを更新しました");
+		try{
+			this.status.save();
+			log.info("statusファイルを保存しました");
+		}catch (Exception e) {
+			log.error("Status File save Error.",e);
 		}
 	}
 	
