@@ -568,6 +568,7 @@ pop3接続のspモードメールの両方を指しています。
 spmode.protocol
 　[imap]を指定するとドコモメールを使用します。
 　[pop3]を指定するとiPhone用のpop3接続spモードメールを使用します。
+　[both]を指定すると[imap]と[pop3]の両方を同時に有効にした状態になります。
 　デフォルト[imap]
 
 spmode.mail
