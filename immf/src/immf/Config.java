@@ -263,7 +263,7 @@ public class Config {
 	private boolean spmodePop3SyncOnly = false;
 	private String imodenetSyncFolder = "受信BOX(iモード)";
 	private String imodenetSyncSentFolder = "送信BOX(iモード)";
-	private String spmodePop3SyncFolder = "メッセージR/S";
+	private String spmodePop3SyncFolder = "メッセージR";
 	private boolean spmodeSubscribeSyncFolder = true;
 	
 	// Skypeに転送
