@@ -762,7 +762,7 @@ spmode.syncimap.only
 
 spmode.syncimap.folder
 　spモードメール(pop3)で受信したメールはこのパラメータで指定したドコモメールのフォルダに保存されます。
-　デフォルト[メッセージR/S]
+　デフォルト[メッセージR]
 
 
 ■サンプル
