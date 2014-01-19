@@ -278,7 +278,7 @@ public class SpmodeImapReader extends SpmodeReader implements UncaughtExceptionH
 		if(StringUtils.isBlank(thisId)) {
 			return;
 		}
-		if(!StringUtils.isBlank(lastId) && thisId.compareToIgnoreCase(getLastId())<0){
+		if(!StringUtils.isBlank(lastId) && thisId.compareToIgnoreCase(getLastId())<=0){
 			return;
 		}
 		this.status.setLastSpMsgUid(thisId);
