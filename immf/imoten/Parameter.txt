@@ -189,27 +189,26 @@ forward.prowl.keys
 　API Keyの取得については http://www.prowlapp.com/ にてユーザー登録を行うことで可能です。
 
 forward.push.email
-　iPhone/iPod/iPadアプリのPush(http://www.appnotifications.com/)を使用してメール着信を通知します。
-　登録時のメールアドレスとパスワードをそれぞれ[forward.push.email]と[forward.push.password]に
-　設定してください。
-
 forward.push.password
-　iPhone/iPod/iPadアプリのPush(http://www.appnotifications.com/)を使用してメール着信を通知します。
-　登録時のメールアドレスとパスワードをそれぞれ[forward.push.email]と[forward.push.password]に
+　iPhone/iPod/iPadアプリのFaast(http://www.appnotifications.com/ 旧名称Push)を使用してメール着信を通知します。
+　Faastアプリ登録時のメールアドレスとパスワードをそれぞれ[forward.push.email]と[forward.push.password]に
 　設定してください。
+　Faastアプリの無料(Trial Mode/Free Plan)で使用可能な機能(JASON API)だけを使用していますので、
+　Faastアプリをダウンロードした後はアカウント登録を行うのみで使用できます。
 
 forward.push.message
+　※Faast(旧名称Push)でのみ有効なオプション
 　メール着信通知で表示されるポップアップウィンドウのメッセージを変更できます。
 　デフォルト[新着iモードメールあり]
 
 forward.push.notifyfrom
-　※Push,im.kayac.com,Prowl,NMAで有効なオプション
+　※Faast(旧名称Push),im.kayac.com,Prowl,NMAで有効なオプション
 　メール着信通知で表示されるポップアップウィンドウにメール送信者名を表示するかどうか設定できます。
 　[false]を設定すると表示しません。
 　デフォルト[true]
 
 forward.push.notifysubject
-　※Push,im.kayac.com,Prowl,NMAで有効なオプション
+　※Faast(旧名称Push),im.kayac.com,Prowl,NMAで有効なオプション
 　メール着信通知で表示されるポップアップウィンドウにメール件名を表示するかどうか設定できます。
 　[false]を設定すると表示しません。
 　デフォルト[false]
@@ -235,29 +234,33 @@ forward.push.notifybody
 　デフォルト[false]
 
 forward.push.sound
+　※Faast(旧名称Push)でのみ有効なオプション
 　メール着信通知の際に使用する効果音を指定できます。無指定時はアプリのデフォルト設定音が使用されます。
-　Pushアプリの設定画面([＊]→[Application Settings]→[Global Sound])で設定可能な音名を指定できます。
+　Faastアプリの設定画面([Inboxes]→[Settings]→[Sounds]→[General])で設定可能な音名を指定できます。
 　大文字小文字スペースの違いは無視します。
-　　設定例：forward.push.sound=Bell One Tone
+　　設定例：forward.push.sound=Aerial 1
 
 forward.push.iconurl
-　メール着信通知内容をPushアプリを起動して確認した際に表示するアイコンを指定できます。
+　※Faast(旧名称Push)でのみ有効なオプション
+　メール着信通知内容をFaast(旧名称Push)アプリを起動して確認した際に表示するアイコンを指定できます。
 　デフォルト[http://imode.net/cmn/images/favicon.ico]
 
 forward.push.usednscache
-　[true]を設定するとPushアプリのサイトへ接続するためのIPアドレス情報をキャッシュできます。
+　※Faast(旧名称Push)でのみ有効なオプション
+　[true]を設定するとFaast(旧名称Push)アプリのサイトへ接続するためのIPアドレス情報をキャッシュできます。
 　Push通知の際にDNSエラーが発生したことによるPush通知の遅延を防ぐことができます。
-　設定した場合、Pushアプリのサイトへ接続する際のSSL証明書検証でサーバー証明書のホスト名の検証を
+　設定した場合、Faast(旧名称Push)アプリのサイトへ接続する際のSSL証明書検証でサーバー証明書のホスト名の検証を
 　省略します。セキュリティが低下するため注意して使用してください。
 　デフォルト[false]
 
 forward.push.replybutton
-　※このパラメータは実験的に追加されたパラメータで、今のところ実用性はあまりないかもしれません。
-　メール着信通知で表示されるポップアップウィンドウに「Reply」ボタンを表示するかどうか設定できます。
-　「Reply」ボタンを押すとそのメールに返信するメール作成画面が表示されますが、元のメールの件名や
-　メール本文は引用されません。このため素早くメールアプリを起動する程度の用途だけを想定しています。
-　また、このパラメータを設定するとポップアップウィンドウに表示可能な文字数が制限されます。ポップアップ
-　ウィンドウに表示される文字の末尾が欠けるようなことがあれば、[forward.push.message]を短い文字列に
+　※Faast(旧名称Push)でのみ有効なオプション
+　※このパラメータは実験的に追加されたパラメータです。
+　メール着信通知をタップするとメールアプリを開くようにします。(iOS7以降)
+　imoten-1.1.47以前の動作はメール作成画面が表示されましたが、メールアプリを起動するように動作が変更されました。
+　(パラメータ名と動作があわなくなったため、パラメータ名はいずれ変更するかもしれません)
+　また、このパラメータを設定すると通知メッセージに表示可能な文字数が制限されます。通知メッセージに
+　表示される文字の末尾が欠けるようなことがあれば、[forward.push.message]を短い文字列に
 　変更するなどしてください。
 　デフォルト[false]
 
