@@ -668,9 +668,9 @@ public class Util {
 		String plainText = s;
 		if(plainText!=null){
 			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*On \\d+/\\d+/\\d+, at \\d+:\\d+, [^\n]* wrote:.*","");
-			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^\n]* wrote:.*","");
+			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+( \\wM)?, [^\n]* wrote:.*","");
 			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*\\d+/\\d+/\\d+ \\d+:\\d+、[^\n]* のメッセージ:.*","");
-			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*\\w\\w\\w \\d+, \\d+ \\d+:\\d+ \\wM、[^\n]* のメッセージ:.*","");
+			plainText = HtmlConvert.replaceAllCaseInsenstive(plainText, "[\r\n]*\\w\\w\\w \\d+, \\d+ \\d+:\\d+( \\wM)?、[^\n]* のメッセージ:.*","");
 		}
 		return plainText;
 	}
@@ -700,14 +700,14 @@ public class Util {
 		if(html!=null){
 			// 厳密一致
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<div><br></div>)*</div><div><br>On \\d+/\\d+/\\d+, at \\d+:\\d+, [^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* wrote:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
-			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<div><br></div>)*</div><div><br>On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* wrote:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
+			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<div><br></div>)*</div><div><br>On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+( \\wM)?, [^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* wrote:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			//html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\d+/\\d+/\\d+ \\d+:\\d+、[^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			//html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\w\\w\\w \\d+, \\d+ \\d+:\\d+ \\wM、[^<>]*(?:(?:<a href=[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\d+/\\d+/\\d+ \\d+:\\d+、.*(?:(?:<a href=\"mailto[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
-			html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\w\\w\\w \\d+, \\d+ \\d+:\\d+ \\wM、.*(?:(?:<a href=\"mailto[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
+			html = HtmlConvert.replaceAllCaseInsenstive(html, "</div><div><br>\\w\\w\\w \\d+, \\d+ \\d+:\\d+( \\wM)?、.*(?:(?:<a href=\"mailto[^<>]*>)+[^<>]*(?:</a>)+)+[^<>]* のメッセージ:(?:<br>)*(?:</?[^<>]+>)+<blockquote type=.*</blockquote>", "</div>");
 			// htmlWorkingContent由来
 			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<br>)*On \\d+/\\d+/\\d+, at \\d+:\\d+, [^<>]* wrote:(?:<br>)*&gt;.*</body>", "</body>");
-			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<br>)*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+ \\wM, [^<>]* wrote:(?:<br>)*&gt;.*</body>", "</body>");
+			html = HtmlConvert.replaceAllCaseInsenstive(html, "(?:<br>)*On \\w\\w\\w \\d+, \\d+, at \\d+:\\d+( \\wM)?, [^<>]* wrote:(?:<br>)*&gt;.*</body>", "</body>");
 		}
 		return html;
 	}
