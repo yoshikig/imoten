@@ -91,6 +91,7 @@ class AppNotifications extends DefaultHandler implements Runnable{
 	private InetAddress pushaddr;
 
 	enum sounds {
+		// Push
 		beep1("5.caf"),
 		bellmodern("10.caf"),
 		bellonetone("21.caf"),
@@ -107,7 +108,86 @@ class AppNotifications extends DefaultHandler implements Runnable{
 		notifier3("4.caf"),
 		orchestrallong("13.caf"),
 		orchestralshort("14.caf"),
-		score("15.caf");
+		score("15.caf"),
+		// Faast
+		aerial1("50"),
+		aerial2("51"),
+		bip("52"),
+		book1("53"),
+		book2("54"),
+		crrattle("58"),
+		cabasexpress("55"),
+		cocoon("56"),
+		coin("57"),
+		cringly1("59"),
+		cringly2("60"),
+		cringly3("61"),
+		cringly4("62"),
+		cringly5("63"),
+		cringly6("64"),
+		ding("65"),
+		drone1("66"),
+		drone2("67"),
+		drone3("68"),
+		drone4("69"),
+		drop1("70"),
+		drop2("71"),
+		elgard("72"),
+		flute1("73"),
+		flute2("74"),
+		frogwood("75"),
+		gate("76"),
+		hoa("77"),
+		hongkong("78"),
+		humanclic1("79"),
+		humanclic2("80"),
+		identity1("122"),
+		identity2("123"),
+		identity3("124"),
+		identity4("125"),
+		identity5("126"),
+		identity6("127"),
+		jazz("81"),
+		kalimba1("82"),
+		kalimba2("83"),
+		node1("84"),
+		node2("85"),
+		node3("86"),
+		node4("87"),
+		node5("88"),
+		node6("89"),
+		node7("90"),
+		nuairy1("91"),
+		nuairy2("92"),
+		orpho1("93"),
+		orpho2("94"),
+		percuroll("95"),
+		port1("96"),
+		port2("97"),
+		port3("98"),
+		port4("99"),
+		rhodes("104"),
+		rhodes1("100"),
+		rhodes2("101"),
+		rhodes3("102"),
+		rhodes4("103"),
+		rim1("105"),
+		rim2("106"),
+		rim3("107"),
+		saintgermain("110"),
+		saintgermain2("108"),
+		saintgermain3("109"),
+		simple1("111"),
+		simple2("112"),
+		simple3("113"),
+		simple4("114"),
+		simple5("115"),
+		snap("116"),
+		somethinghere("117"),
+		stomp("118"),
+		trip("119"),
+		zen1("120"),
+		zen2("121");
 		
 		private String file;
 		private sounds(String file){
@@ -231,33 +311,7 @@ class AppNotifications extends DefaultHandler implements Runnable{
 				}
 			}
 			if(mail!=null && this.pushReplyButton){
-				// スペース(%20)は使用禁止。+に置換されてしまう。
-				InternetAddress fromAddr = mail.getFromAddr();
-				pushCommand = "mailto:" + fromAddr.getAddress();
-				for (InternetAddress to : mail.getToAddrList()) {
-					pushCommand += "%2C" + to.getAddress();
-				}
-				String ccList = "";
-				for (InternetAddress cc : mail.getCcAddrList()) {
-					if(ccList.isEmpty()){
-						ccList = "?cc=" + cc.getAddress();
-					}else{
-						ccList += "%2C" + cc.getAddress();
-					}
-				}
-				if(!ccList.isEmpty()){
-					pushCommand += ccList;
-					//pushCommand += "&subject=";
-				//}else{
-					//pushCommand += "?subject=";
-				}
-				/* 
-				 * XXX
-				 * Apple URL Scheme Referenceでは RFC2368 に従うとあるが、これに従い
-				 * 8bit文字を使用した subject のエンコードとして RFC2047 に従ってもデコードされない。
-				 * また、エンコードをせずに生8bit文字を送信すると Push が悲鳴をあげる。
-				 * Push のバージョンアップで解消するかなぁ。
-				 */
+				pushCommand = "message:";
 			}
 			try{
 				log.info("push通知:"+pushMessage.replace("\n","/"));
@@ -490,8 +544,7 @@ class AppNotifications extends DefaultHandler implements Runnable{
 		formparams.add(new BasicNameValuePair("notification[message_level]","2"));
 		formparams.add(new BasicNameValuePair("notification[silent]","0"));
 		if(command!=null && !command.isEmpty()){
-			// 表示文字数をかせぐためaction_loc_keyは半角で・・・
-			formparams.add(new BasicNameValuePair("notification[action_loc_key]","Reply"));
+			formparams.add(new BasicNameValuePair("notification[action_loc_key]",""));
 			formparams.add(new BasicNameValuePair("notification[run_command]",command));
 		}else{
 			formparams.add(new BasicNameValuePair("notification[action_loc_key]",""));
