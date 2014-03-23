@@ -29,8 +29,13 @@ smtp.timeout
 　デフォルト[30]。
 
 smtp.tls
-　転送に使用するSMTPサーバがTLSを使用する場合[true]。
+　転送に使用するSMTPサーバがTLS(STARTTLS)を使用する場合[true]。
 　TLSを使用しない場合[false]。
+　デフォルト[false]。
+
+smtp.ssl
+　転送に使用するSMTPサーバとSSL(SMTP over SSL)で接続する場合[true]。
+　SSLを使用しない場合[false]。[smtp.tls]がtrueの場合、本パラメータは無効です。
 　デフォルト[false]。
 
 smtp.from
