@@ -120,6 +120,7 @@ public class SendMailPicker implements Runnable{
 		mail.setSocketConnectionTimeout(conf.getSmtpConnectTimeoutSec()*1000);
 		mail.setSocketTimeout(conf.getSmtpTimeoutSec()*1000);
 		mail.setTLS(conf.isSmtpTls());
+		mail.setSSL(conf.isSmtpSsl());
 
 		if(!StringUtils.isBlank(conf.getSmtpUser())){
 			mail.setAuthentication(conf.getSmtpUser(), conf.getSmtpPasswd());
