@@ -25,6 +25,7 @@ package immf;
 import java.io.IOException;
 import java.lang.IllegalStateException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -43,6 +44,7 @@ import javax.mail.Multipart;
 import javax.mail.Part;
 import javax.mail.Session;
 import javax.mail.internet.ContentType;
+import javax.mail.internet.HeaderTokenizer;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.InternetHeaders;
 import javax.mail.internet.MimeBodyPart;
@@ -189,6 +191,110 @@ public class SpmodeForwardMail extends MyHtmlEmail {
 			
 			// Subject:
 			smmSubject = smm.getSubject();
+			
+			/*
+			 * XXX
+			 * ドコモが送ってくるメールなど、Unicode1文字が分割されてBase64エンコードされた件名の復号。
+			 * getSubject()の延長で実行される decodeText() が  0xfffd を作り出すのでこれを判定に
+			 * 用いているが、判定条件としては不十分かもしれない。
+			 * HeaderTokenizer の使い道が違う気がする。
+			 */
+			boolean subjectWorkaround = false;
+			if (smmSubject != null) {
+				for (int i = 0; i < smmSubject.length(); ) {
+					int cp = smmSubject.codePointAt(i);
+					if (cp == 0xfffd) {
+						log.warn("MimeUtility.decodeText()エラー発生。workaroundコードを実行します。");
+						subjectWorkaround = true;
+						break;
+					}
+					i += Character.charCount(cp);
+				}
+			}
+			if (subjectWorkaround) {
+				String[] h = smm.getHeader("Subject");
+				if (h == null || h.length < 1) {
+					smmSubject = "";
+				} else {
+					HeaderTokenizer tokenizer =
+						new HeaderTokenizer(h[0], HeaderTokenizer.MIME, true);
+					HeaderTokenizer.Token token;
+					ByteBuffer bb = ByteBuffer.allocate(1024);
+					String v;
+
+					log.info("Subject decoding start. (workaround)");
+					try {
+						while (true) {
+							// =
+							token = tokenizer.next();
+							if (token.getType() == HeaderTokenizer.Token.EOF) break;
+							if (token.getType() == ';') break;
+							if (token.getType() != '=') {
+								throw new Exception("not MIME encoding : " + token.getValue());
+							}
+
+							// ?
+							token = tokenizer.next();
+							if (token.getType() != '?') {
+								throw new Exception("not MIME encoding : " + token.getValue());
+							}
+
+							// utf-8
+							token = tokenizer.next();
+							if (!token.getValue().equalsIgnoreCase("UTF-8")) {
+								throw new Exception("not UTF-8 string : " + token.getValue());
+							}
+
+							// ?
+							token = tokenizer.next();
+							if (token.getType() != '?') {
+								throw new Exception("not MIME string : " + token.getValue());
+							}
+
+							// B
+							token = tokenizer.next();
+							if (!token.getValue().equalsIgnoreCase("B")) {
+								throw new Exception("not Base64 encoding : " + token.getValue());
+							}
+
+							// ?
+							token = tokenizer.next();
+							if (token.getType() != '?') {
+								throw new Exception("not MIME encoding : " + token.getValue());
+							}
+
+							// Base64 part
+							StringBuffer sb = new StringBuffer();
+							token = tokenizer.next();
+							for (;token.getType() != '?'; token = tokenizer.next()){
+								if (token.getType() == HeaderTokenizer.Token.EOF) {
+									throw new Exception("unexpected EOF");
+								}
+								v = token.getValue();
+								sb.append(v);
+							}
+							String s = new String(sb);
+							log.info("base64: " + s);
+							bb.put(Base64.decodeBase64(s.getBytes()));
+
+							// =
+							token = tokenizer.next();
+							if (token.getType() != '=') {
+								throw new Exception("not MIME string : " + token.getValue());
+							}
+						}
+					} catch (Exception eee){
+						log.error("NO GOOD",eee);
+					}
+					bb.limit(bb.position());
+					bb.position(0);
+					byte[] ba = new byte[bb.limit()];
+					bb.get(ba);
+					smmSubject = new String(ba);
+
+					log.info("Subject decoding done: " + smmSubject);
+				}
+			}
 			if (smmSubject==null){
 				smmSubject = "";
 			}
